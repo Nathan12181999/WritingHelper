@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Online Vocabulary Platform</title>
+    <!-- Load FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* --- CORE THEME --- */
+        :root {
+            --navy: #0f172a;
+            --navy-light: #1e293b;
+            --gold: #d4af37;
+            --gold-light: #f3e5ab;
+            --white: #ffffff;
+            --bg: #f1f5f9;
+            --success: #10b981;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg); color: var(--navy); padding-bottom: 80px; overflow-x: hidden; }
+
+        /* --- LAYOUT UTILS --- */
+        .container { max-width: 1000px; margin: 0 auto; padding: 0 15px; }
+        .hidden { display: none !important; }
+        .btn { cursor: pointer; border: none; outline: none; transition: 0.2s; font-weight: 700; border-radius: 8px; touch-action: manipulation; }
+        .btn:active { transform: scale(0.98); }
+
+        /* --- HEADER --- */
+        header { background: var(--navy); color: var(--white); padding: 10px 0; position: sticky; top: 0; z-index: 100; border-bottom: 4px solid var(--gold); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .logo { font-size: 1.2rem; font-weight: 800; color: var(--gold); letter-spacing: 1px; white-space: nowrap; }
+        
+        .mode-switch { display: flex; gap: 5px; background: rgba(255,255,255,0.1); padding: 4px; border-radius: 50px; }
+        .mode-btn { padding: 6px 12px; border-radius: 40px; color: var(--white); background: transparent; font-size: 0.8rem; cursor: pointer; border: none; white-space: nowrap; }
+        .mode-btn.active { background: var(--gold); color: var(--navy); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+
+        /* --- UNIT NAVIGATION BAR (STICKY) --- */
+        .unit-nav { 
+            position: sticky; 
+            top: 60px; /* Below header */
+            z-index: 90;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(5px);
+            padding: 8px 0;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #e2e8f0;
+            white-space: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            gap: 8px;
+            padding-left: 15px; /* Side padding for scroll container */
+            padding-right: 15px;
+        }
+        /* Hide scrollbar but keep functionality */
+        .unit-nav::-webkit-scrollbar { display: none; }
+        .unit-nav { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .unit-jump-btn {
+            background: var(--white);
+            border: 1px solid var(--navy-light);
+            color: var(--navy);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: 0.2s;
+            flex-shrink: 0;
+        }
+        .unit-jump-btn:active { background: var(--navy-light); color: var(--white); }
+
+        /* --- STUDY MODE (ACCORDION) --- */
+        .accordion-container { margin-top: 15px; }
+        
+        .unit-section { 
+            background: var(--white); 
+            border-radius: 12px; 
+            margin-bottom: 12px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+            overflow: hidden; 
+            transition: all 0.3s ease;
+            scroll-margin-top: 110px;
+        }
+        
+        /* The Foldable Header */
+        .unit-header { 
+            padding: 15px 20px; 
+            background: var(--white);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-left: 5px solid var(--gold);
+            transition: 0.2s;
+            user-select: none;
+        }
+        .unit-header:active { background: #f8fafc; }
+        
+        .unit-title-text { font-size: 1.1rem; font-weight: 800; color: var(--navy); }
+        .unit-count { font-size: 0.75rem; background: var(--bg); padding: 3px 8px; border-radius: 20px; color: #64748b; font-weight: 600; margin-left: 8px; }
+        .accordion-icon { font-size: 1rem; color: var(--navy-light); transition: transform 0.3s; }
+        
+        /* Expanded State */
+        .unit-section.active .unit-header { background: var(--navy); border-left-color: var(--navy); }
+        .unit-section.active .unit-title-text { color: var(--white); }
+        .unit-section.active .accordion-icon { transform: rotate(180deg); color: var(--gold); }
+        .unit-section.active .unit-count { background: rgba(255,255,255,0.2); color: var(--white); }
+
+        .unit-content { 
+            display: none; 
+            padding: 15px; 
+            background: #f1f5f9; 
+            border-top: 1px solid #e2e8f0;
+        }
+        .unit-section.active .unit-content { display: grid; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        @media (max-width: 600px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        
+        /* CARD STYLES */
+        .card { background: var(--white); border-radius: 12px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); border-top: 4px solid var(--white); transition: 0.3s; position: relative; }
+        /* Remove hover effect on mobile to prevent sticky hover states */
+        @media (hover: hover) {
+            .card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px rgba(0,0,0,0.1); border-top-color: var(--gold); }
+        }
+        
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .pos-tag { background: #e2e8f0; color: #64748b; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+        .audio-icon { color: var(--gold); cursor: pointer; font-size: 1.4rem; padding: 10px; margin: -10px; /* Increase touch area */ }
+        .audio-icon:active { color: var(--navy); transform: scale(0.9); }
+
+        .english-display { font-size: 1.8rem; font-weight: 800; text-align: center; color: var(--navy); margin-bottom: 10px; letter-spacing: -0.5px; word-wrap: break-word; }
+        .sentence { background: #f8fafc; padding: 10px; border-radius: 8px; font-style: italic; color: #475569; font-size: 0.9rem; text-align: center; margin-bottom: 15px; border-left: 3px solid var(--gold); line-height: 1.4; }
+
+        .reveal-box { 
+            background: var(--navy); 
+            color: var(--white); 
+            padding: 12px; 
+            border-radius: 8px; 
+            text-align: center; 
+            position: relative; 
+            cursor: pointer; 
+            overflow: hidden; 
+            height: 50px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            touch-action: manipulation;
+        }
+        .chinese-hidden { font-size: 1.4rem; font-weight: 700; filter: blur(8px); opacity: 0.4; transition: 0.2s; }
+        .reveal-hint { position: absolute; font-size: 0.75rem; color: var(--gold); font-weight: 700; letter-spacing: 1px; pointer-events: none; transition: 0.2s; text-transform: uppercase; }
+        
+        /* Mobile-friendly reveal (active state instead of hover) */
+        .reveal-box:active .chinese-hidden, .reveal-box.revealed .chinese-hidden { filter: blur(0); opacity: 1; }
+        .reveal-box:active .reveal-hint, .reveal-box.revealed .reveal-hint { opacity: 0; }
+        
+        /* Desktop hover support */
+        @media (hover: hover) {
+            .reveal-box:hover .chinese-hidden { filter: blur(0); opacity: 1; }
+            .reveal-box:hover .reveal-hint { opacity: 0; }
+        }
+
+        /* --- CHALLENGE MODE (GAME) --- */
+        .challenge-container { max-width: 600px; margin: 20px auto; background: var(--white); border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; text-align: center; border: 1px solid #e2e8f0; }
+        
+        .setup-screen { padding: 40px 20px; }
+        .setup-icon { font-size: 3.5rem; color: var(--gold); margin-bottom: 20px; }
+        .unit-select-btn { display: block; width: 100%; padding: 15px; margin-bottom: 10px; background: var(--bg); border: 2px solid #e2e8f0; border-radius: 10px; font-size: 1rem; text-align: left; font-weight: 600; color: var(--navy); transition: 0.2s; }
+        .unit-select-btn:active { border-color: var(--gold); background: #fffbeb; }
+        .unit-select-btn.selected { background: var(--navy); color: white; border-color: var(--navy); }
+        .start-btn { width: 100%; padding: 15px; background: var(--gold); color: var(--navy); font-size: 1.2rem; font-weight: 800; margin-top: 20px; border-radius: 10px; }
+        .start-btn:active { background: #b89628; transform: scale(0.98); }
+
+        /* Game Screen */
+        .game-screen { padding: 30px 20px; display: none; }
+        .progress-bar { width: 100%; height: 6px; background: #e2e8f0; border-radius: 4px; margin-bottom: 25px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--gold); width: 0%; transition: 0.3s; }
+        
+        .game-card { padding: 25px 15px; background: #f8fafc; border-radius: 15px; margin-bottom: 25px; border: 2px dashed #cbd5e1; }
+        .game-chinese { font-size: 2.2rem; font-weight: 800; color: var(--navy); margin-bottom: 10px; word-wrap: break-word; }
+        .game-pos { background: var(--gold); color: var(--navy); padding: 3px 10px; border-radius: 20px; font-weight: 700; font-size: 0.8rem; display: inline-block; margin-bottom: 20px; }
+        
+        /* Audio Button in Game */
+        .game-audio-btn {
+            background: var(--white);
+            color: var(--navy);
+            border: 2px solid var(--gold);
+            width: 60px; /* Larger touch target */
+            height: 60px;
+            border-radius: 50%;
+            font-size: 1.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .game-audio-btn:active { background: var(--gold); color: var(--white); transform: scale(0.95); }
+
+        .game-input-area { margin-top: 20px; }
+        .game-input { width: 100%; padding: 15px; font-size: 1.3rem; text-align: center; border: 2px solid #cbd5e1; border-radius: 10px; font-weight: bold; color: var(--navy); letter-spacing: 1px; outline: none; -webkit-appearance: none; }
+        .game-input:focus { border-color: var(--navy); }
+        .game-input.correct { border-color: var(--success); color: var(--success); background: #f0fdf4; }
+        .game-input.wrong { border-color: var(--danger); color: var(--danger); background: #fef2f2; }
+        .check-btn { background: var(--navy); color: var(--white); padding: 15px; font-size: 1.1rem; width: 100%; margin-top: 15px; border-radius: 10px; font-weight: 800; }
+        
+        .feedback-area { display: none; margin-top: 20px; animation: popIn 0.3s; }
+        .feedback-title { font-size: 1.5rem; font-weight: 800; margin-bottom: 5px; }
+        .feedback-correct { color: var(--success); }
+        .feedback-wrong { color: var(--danger); }
+        .correct-answer-display { color: var(--navy-light); font-size: 1.2rem; font-weight: 700; margin-bottom: 10px; }
+        .game-hint-sentence { font-style: italic; color: #64748b; margin-bottom: 20px; padding: 10px; background: rgba(0,0,0,0.03); border-radius: 8px; font-size: 0.95rem; }
+        .next-btn { background: var(--gold); color: var(--navy); padding: 15px; font-size: 1.1rem; width: 100%; border-radius: 10px; font-weight: 800; }
+
+        /* Result Screen */
+        .result-screen { padding: 0; display: none; background: var(--navy); color: white; min-height: 80vh; display: flex; flex-direction: column; justify-content: center; }
+        .certificate { padding: 40px 20px; border: 8px solid var(--gold); margin: 20px; text-align: center; background: var(--navy); border-radius: 10px; }
+        .cert-title { font-family: serif; font-size: 2rem; color: var(--gold); margin-bottom: 10px; letter-spacing: 2px; }
+        .cert-score-val { font-size: 3.5rem; font-weight: 800; color: var(--gold); line-height: 1; margin: 20px 0; }
+        .restart-btn { background: var(--white); color: var(--navy); padding: 15px 40px; font-size: 1.1rem; width: 100%; display: inline-block; margin-top: 20px; font-weight: 800; border-radius: 50px; }
+
+        @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: rgba(15, 23, 42, 0.95); color: white; padding: 12px 24px; border-radius: 30px; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 2000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-weight: 600; display: flex; align-items: center; gap: 10px; font-size: 0.9rem; white-space: nowrap; }
+        .toast.show { opacity: 1; bottom: 100px; }
+
+        @media (min-width: 601px) {
+            .result-screen { display: none; } /* Reset display property for larger screens handled by JS */
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container header-inner">
+            <div class="logo"><i class="fas fa-crown"></i> Online Vocab</div>
+            <div class="mode-switch">
+                <button class="mode-btn active" onclick="switchMode('study')" id="btn-study"><i class="fas fa-book-open"></i> Study</button>
+                <button class="mode-btn" onclick="switchMode('challenge')" id="btn-challenge"><i class="fas fa-gamepad"></i> Play</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- === STUDY MODE === -->
+    <div id="study-view" class="container accordion-container">
+        <!-- Quick Jump Nav -->
+        <div class="unit-nav">
+            <button class="unit-jump-btn" onclick="jumpTo('L2.09')">L2.09</button>
+            <button class="unit-jump-btn" onclick="jumpTo('L2.10')">L2.10</button>
+            <button class="unit-jump-btn" onclick="jumpTo('L2.11')">L2.11</button>
+            <button class="unit-jump-btn" onclick="jumpTo('L2.12')">L2.12</button>
+        </div>
+        
+        <!-- Units inserted by JS as foldables -->
+    </div>
+
+    <!-- === CHALLENGE MODE === -->
+    <div id="challenge-view" class="container hidden">
+        <div class="challenge-container">
+            
+            <!-- 1. Setup -->
+            <div id="setup-screen" class="setup-screen">
+                <div class="setup-icon"><i class="fas fa-dumbbell"></i></div>
+                <h2 style="margin-bottom: 10px; color:var(--navy);">Self-Challenge</h2>
+                <p style="color: #64748b; margin-bottom: 30px;">Select a unit. Compete against yourself!</p>
+                
+                <div style="text-align:left; margin-bottom:10px; font-weight:700; color:var(--navy-light);">Choose Unit:</div>
+                <button class="btn unit-select-btn selected" onclick="selectUnit(this, 'all')">All Units (Random Mix)</button>
+                <button class="btn unit-select-btn" onclick="selectUnit(this, 'L2.09')">Unit L2.09</button>
+                <button class="btn unit-select-btn" onclick="selectUnit(this, 'L2.10')">Unit L2.10</button>
+                <button class="btn unit-select-btn" onclick="selectUnit(this, 'L2.11')">Unit L2.11</button>
+                <button class="btn unit-select-btn" onclick="selectUnit(this, 'L2.12')">Unit L2.12</button>
+
+                <button class="btn start-btn" onclick="startChallenge()">Start Quiz</button>
+            </div>
+
+            <!-- 2. Game -->
+            <div id="game-screen" class="game-screen">
+                <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+                
+                <div class="game-card">
+                    <div id="game-pos" class="game-pos">NOUN</div>
+                    
+                    <!-- Question & Audio -->
+                    <div class="game-question-box">
+                        <div id="game-chinese" class="game-chinese">測試</div>
+                        <!-- NEW AUDIO BUTTON -->
+                        <button class="game-audio-btn" onclick="playGameAudio()">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                    </div>
+
+                    <!-- Input -->
+                    <div id="input-area" class="game-input-area">
+                        <input type="text" id="game-input" class="game-input" placeholder="Type English here..." autocomplete="off" autocapitalize="off" autocorrect="off">
+                        <button id="check-btn" class="btn check-btn" onclick="checkAnswer()">Check Answer</button>
+                    </div>
+
+                    <!-- Feedback -->
+                    <div id="feedback-area" class="feedback-area">
+                        <div id="feedback-title" class="feedback-title">Correct!</div>
+                        <div id="correct-answer" class="correct-answer-display"></div>
+                        <div id="feedback-sentence" class="game-hint-sentence"></div>
+                        <button class="btn next-btn" id="next-btn" onclick="nextCard()">Next Word <i class="fas fa-arrow-right"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Result -->
+            <div id="result-screen" class="result-screen" style="display:none;">
+                <div class="certificate">
+                    <div class="cert-title">RESULT</div>
+                    <div style="font-size: 1.2rem; color: #e2e8f0; margin-bottom: 10px;">Your Score</div>
+                    <div id="cert-score" class="cert-score-val">100</div>
+                    <div id="cert-msg" style="font-size: 1.1rem; color: var(--gold-light);">Excellent Work!</div>
+                    <div class="action-buttons">
+                        <a id="submit-link" href="#" target="_blank" class="submit-btn" style="display:none; text-decoration:none; color:white; background:#10b981; padding:15px; border-radius:8px; width:100%; margin-top:15px; font-weight:700;"><i class="fas fa-paper-plane" style="margin-right: 8px;"></i> Submit to Teacher</a>
+                        <button class="btn restart-btn" onclick="location.reload()"><i class="fas fa-redo"></i> Play Again</button>
+                    </div>
+                    <p style="font-size: 0.8rem; opacity: 0.7; margin-top: 15px;">Screenshot for your records.</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="toast" class="toast"><i class="fas fa-volume-up"></i> Playing audio...</div>
+
+    <script>
+        // --- TEACHER CONFIGURATION ---
+        const GOOGLE_FORM_URL = ""; 
+
+        // --- DATA ---
+        const VOCAB_DB = {
+            "L2.09": [
+                {en:"anymore",ch:"不再",pos:"adv",s:"I don't live there anymore."},
+                {en:"branch",ch:"樹枝 / 分店",pos:"n",s:"The bird sat on a tree branch."},
+                {en:"brutal",ch:"殘忍的",pos:"adj",s:"The war was brutal."},
+                {en:"carpet",ch:"地毯",pos:"n",s:"Red carpet."},
+                {en:"carrot",ch:"胡蘿蔔",pos:"n",s:"Rabbits eat carrots."},
+                {en:"castle",ch:"城堡",pos:"n",s:"King's castle."},
+                {en:"cherry",ch:"櫻桃",pos:"n",s:"Cherry on top."},
+                {en:"coin",ch:"硬幣",pos:"n",s:"Gold coin."},
+                {en:"collar",ch:"衣領",pos:"n",s:"Shirt collar."},
+                {en:"confirm",ch:"確認",pos:"v",s:"Please confirm."},
+                {en:"corridor",ch:"走廊",pos:"n",s:"Long corridor."},
+                {en:"couch",ch:"沙發",pos:"n",s:"Sit on the couch."},
+                {en:"cruel",ch:"殘忍的",pos:"adj",s:"Don't be cruel."},
+                {en:"deliver",ch:"傳送",pos:"v",s:"Deliver mail."},
+                {en:"dessert",ch:"甜點",pos:"n",s:"Sweet dessert."},
+                {en:"detective",ch:"偵探",pos:"n",s:"Private detective."},
+                {en:"dim",ch:"暗淡的",pos:"adj",s:"Dim light."},
+                {en:"disappointed",ch:"失望的",pos:"adj",s:"He felt disappointed."},
+                {en:"float",ch:"浮",pos:"v",s:"Boats float."},
+                {en:"footstep",ch:"腳步聲",pos:"n",s:"Loud footsteps."},
+                {en:"formula",ch:"公式",pos:"n",s:"Math formula."},
+                {en:"frozen",ch:"結冰的",pos:"adj",s:"Frozen water."},
+                {en:"furthermore",ch:"此外",pos:"adv",s:"Furthermore, I agree."},
+                {en:"gaze",ch:"凝視",pos:"v",s:"Gaze at stars."},
+                {en:"grid",ch:"網格",pos:"n",s:"Draw a grid."},
+                {en:"guideline",ch:"指引",pos:"n",s:"Safety guidelines."},
+                {en:"hint",ch:"暗示",pos:"n",s:"Give me a hint."},
+                {en:"icon",ch:"圖標",pos:"n",s:"Click the icon."},
+                {en:"instructor",ch:"指導員",pos:"n",s:"Gym instructor."},
+                {en:"introduce",ch:"介紹",pos:"v",s:"Introduce yourself."},
+                {en:"invitation",ch:"邀請函",pos:"n",s:"Party invitation."},
+                {en:"lighting",ch:"照明",pos:"n",s:"Good lighting."},
+                {en:"manage",ch:"管理",pos:"v",s:"Manage a team."},
+                {en:"pillow",ch:"枕頭",pos:"n",s:"Soft pillow."},
+                {en:"platform",ch:"平台",pos:"n",s:"Train platform."},
+                {en:"pose",ch:"姿勢",pos:"n",s:"Strike a pose."},
+                {en:"praise",ch:"稱讚",pos:"v",s:"Praise him."},
+                {en:"protective",ch:"保護的",pos:"adj",s:"Protective gear."},
+                {en:"purse",ch:"零錢包",pos:"n",s:"Lost purse."},
+                {en:"quote",ch:"引用",pos:"v",s:"Quote a book."},
+                {en:"robbery",ch:"搶劫案",pos:"n",s:"Bank robbery."},
+                {en:"romantic",ch:"浪漫的",pos:"adj",s:"Romantic dinner."},
+                {en:"salary",ch:"薪水",pos:"n",s:"High salary."},
+                {en:"signal",ch:"信號",pos:"n",s:"Traffic signal."},
+                {en:"sink",ch:"下沉",pos:"v",s:"Ships sink."},
+                {en:"slope",ch:"斜坡",pos:"n",s:"Steep slope."},
+                {en:"spread",ch:"傳播",pos:"v",s:"Spread news."},
+                {en:"stranger",ch:"陌生人",pos:"n",s:"Total stranger."},
+                {en:"swear",ch:"發誓",pos:"v",s:"I swear."},
+                {en:"talented",ch:"有才華的",pos:"adj",s:"Talented artist."},
+                {en:"youngster",ch:"少年人",pos:"n",s:"Energetic youngster."}
+            ],
+            "L2.10": [
+                {en:"abroad",ch:"在國外",pos:"adv",s:"Study abroad."},
+                {en:"acceptable",ch:"可接受的",pos:"adj",s:"Is this acceptable?"},
+                {en:"artistic",ch:"藝術的",pos:"adj",s:"Artistic skill."},
+                {en:"assembly",ch:"集會",pos:"n",s:"Morning assembly."},
+                {en:"assess",ch:"評估",pos:"v",s:"Assess the value."},
+                {en:"attach",ch:"附上",pos:"v",s:"Attach a file."},
+                {en:"bias",ch:"偏見",pos:"n",s:"Unfair bias."},
+                {en:"bid",ch:"出價",pos:"v",s:"Bid on item."},
+                {en:"bind",ch:"捆綁",pos:"v",s:"Bind together."},
+                {en:"briefly",ch:"簡要地",pos:"adv",s:"Speak briefly."},
+                {en:"chief",ch:"首席",pos:"n",s:"Police chief."},
+                {en:"creativity",ch:"創造力",pos:"n",s:"Show creativity."},
+                {en:"curtain",ch:"窗簾",pos:"n",s:"Close curtains."},
+                {en:"custom",ch:"習俗",pos:"n",s:"Local custom."},
+                {en:"database",ch:"資料庫",pos:"n",s:"Data base."},
+                {en:"defeat",ch:"打敗",pos:"v",s:"Defeat enemy."},
+                {en:"dependent",ch:"依賴的",pos:"adj",s:"Dependent on."},
+                {en:"detect",ch:"偵測",pos:"v",s:"Detect smoke."},
+                {en:"draft",ch:"草稿",pos:"n",s:"First draft."},
+                {en:"edition",ch:"版本",pos:"n",s:"New edition."},
+                {en:"emotion",ch:"情感",pos:"n",s:"Show emotion."},
+                {en:"excitement",ch:"激動",pos:"n",s:"Full of excitement."},
+                {en:"experiment",ch:"實驗",pos:"n",s:"Lab experiment."},
+                {en:"flexible",ch:"靈活的",pos:"adj",s:"Flexible body."},
+                {en:"hunger",ch:"飢餓",pos:"n",s:"Feel hunger."},
+                {en:"ideal",ch:"理想的",pos:"adj",s:"Ideal home."},
+                {en:"indoor",ch:"室內的",pos:"adj",s:"Indoor games."},
+                {en:"infection",ch:"感染",pos:"n",s:"Skin infection."},
+                {en:"invest",ch:"投資",pos:"v",s:"Invest money."},
+                {en:"launch",ch:"發射",pos:"v",s:"Launch rocket."},
+                {en:"logical",ch:"合邏輯的",pos:"adj",s:"Logical step."},
+                {en:"observation",ch:"觀察",pos:"n",s:"Under observation."},
+                {en:"organic",ch:"有機的",pos:"adj",s:"Organic food."},
+                {en:"pace",ch:"步伐",pos:"n",s:"Fast pace."},
+                {en:"panic",ch:"恐慌",pos:"n",s:"Don't panic."},
+                {en:"permit",ch:"許可證",pos:"n",s:"Work permit."},
+                {en:"preference",ch:"偏愛",pos:"n",s:"My preference."},
+                {en:"promotion",ch:"晉級",pos:"n",s:"Job promotion."},
+                {en:"proof",ch:"證明",pos:"n",s:"Proof of ID."},
+                {en:"related",ch:"有關的",pos:"adj",s:"Related items."},
+                {en:"routine",ch:"常規",pos:"n",s:"Daily routine."},
+                {en:"ruin",ch:"毀掉",pos:"v",s:"Ruin the day."},
+                {en:"stack",ch:"堆疊",pos:"v",s:"Stack chairs."},
+                {en:"stem",ch:"莖",pos:"n",s:"Flower stem."},
+                {en:"stream",ch:"溪流",pos:"n",s:"Small stream."},
+                {en:"swing",ch:"搖擺",pos:"v",s:"Swing high."},
+                {en:"symbol",ch:"象徵",pos:"n",s:"Peace symbol."},
+                {en:"theft",ch:"偷竊",pos:"n",s:"Car theft."},
+                {en:"weakness",ch:"弱點",pos:"n",s:"My weakness."},
+                {en:"witness",ch:"證人",pos:"n",s:"Eye witness."}
+            ],
+            "L2.11": [
+                {en:"achieve",ch:"達到",pos:"v",s:"Achieve goal."},
+                {en:"achievement",ch:"成就",pos:"n",s:"Big achievement."},
+                {en:"aircraft",ch:"飛機",pos:"n",s:"Fly aircraft."},
+                {en:"ancient",ch:"古代的",pos:"adj",s:"Ancient city."},
+                {en:"appearance",ch:"外貌",pos:"n",s:"Physical appearance."},
+                {en:"atmosphere",ch:"氣氛",pos:"n",s:"Good atmosphere."},
+                {en:"beneath",ch:"在...下",pos:"adj",s:"Beneath water."},
+                {en:"blink",ch:"眨眼",pos:"v",s:"Blink eyes."},
+                {en:"capable",ch:"有能力的",pos:"adj",s:"Capable of."},
+                {en:"challenge",ch:"挑戰",pos:"n",s:"Face challenge."},
+                {en:"chest",ch:"胸部",pos:"n",s:"My chest."},
+                {en:"comfortable",ch:"舒適的",pos:"adj",s:"Comfortable bed."},
+                {en:"despite",ch:"儘管",pos:"prep",s:"Despite rain."},
+                {en:"develop",ch:"發展",pos:"v",s:"Develop plan."},
+                {en:"dozen",ch:"一打",pos:"n",s:"Dozen eggs."},
+                {en:"due to",ch:"由於",pos:"adj phr",s:"Due to rain."},
+                {en:"dying",ch:"瀕死的",pos:"adj",s:"Dying fire."},
+                {en:"ensure",ch:"確保",pos:"v",s:"Ensure safety."},
+                {en:"equal",ch:"平等的",pos:"adj",s:"Equal rights."},
+                {en:"explanation",ch:"解釋",pos:"n",s:"Good explanation."},
+                {en:"gender",ch:"性別",pos:"n",s:"Male gender."},
+                {en:"importance",ch:"重要性",pos:"n",s:"Of importance."},
+                {en:"improve",ch:"改善",pos:"v",s:"Improve skills."},
+                {en:"injury",ch:"受傷",pos:"n",s:"Leg injury."},
+                {en:"instance",ch:"實例",pos:"n",s:"For instance."},
+                {en:"instead",ch:"反而",pos:"adv",s:"Do this instead."},
+                {en:"instruction",ch:"指引",pos:"n",s:"Read instructions."},
+                {en:"international",ch:"國際的",pos:"adj",s:"International flight."},
+                {en:"method",ch:"方法",pos:"n",s:"New method."},
+                {en:"negative",ch:"負面的",pos:"adj",s:"Negative sign."},
+                {en:"neither",ch:"也不",pos:"adv",s:"Neither do I."},
+                {en:"novel",ch:"小說",pos:"n",s:"Read novel."},
+                {en:"numerous",ch:"很多的",pos:"adj",s:"Numerous times."},
+                {en:"personality",ch:"性格",pos:"n",s:"Nice personality."},
+                {en:"possibility",ch:"可能性",pos:"n",s:"No possibility."},
+                {en:"primary",ch:"首要的",pos:"adj",s:"Primary school."},
+                {en:"probably",ch:"大概",pos:"adv",s:"Probably yes."},
+                {en:"rather",ch:"相當",pos:"adv",s:"Rather good."},
+                {en:"relate",ch:"聯繫",pos:"v",s:"Relate to."},
+                {en:"respect",ch:"尊重",pos:"n",s:"Show respect."},
+                {en:"rude",ch:"粗魯的",pos:"adj",s:"Rude boy."},
+                {en:"silence",ch:"寂靜",pos:"n",s:"Total silence."},
+                {en:"slightly",ch:"輕微地",pos:"adv",s:"Slightly off."},
+                {en:"software",ch:"軟件",pos:"n",s:"PC software."},
+                {en:"sore",ch:"疼痛的",pos:"adj",s:"Sore throat."},
+                {en:"spare",ch:"額外的",pos:"adj",s:"Spare tire."},
+                {en:"stare",ch:"凝視",pos:"v",s:"Don't stare."},
+                {en:"steel",ch:"鋼",pos:"n",s:"Made of steel."},
+                {en:"stuff",ch:"東西",pos:"n",s:"My stuff."},
+                {en:"temperature",ch:"溫度",pos:"n",s:"High temperature."},
+                {en:"youth",ch:"年青人",pos:"n",s:"The youth."}
+            ],
+            "L2.12": [
+                {en:"academic",ch:"學術的",pos:"adj",s:"Academic success."},
+                {en:"agreement",ch:"協定",pos:"n",s:"Signed agreement."},
+                {en:"apart",ch:"分開",pos:"adv",s:"Fall apart."},
+                {en:"assistance",ch:"幫助",pos:"n",s:"Need assistance."},
+                {en:"available",ch:"可用的",pos:"adj",s:"Now available."},
+                {en:"barely",ch:"僅僅",pos:"adv",s:"Barely see."},
+                {en:"behaviour",ch:"行為",pos:"n",s:"Bad behaviour."},
+                {en:"tough",ch:"艱難的",pos:"adj",s:"Tough guy."},
+                {en:"concept",ch:"概念",pos:"n",s:"New concept."},
+                {en:"condition",ch:"狀況",pos:"n",s:"Good condition."},
+                {en:"consumer",ch:"消費者",pos:"n",s:"Consumer goods."},
+                {en:"definition",ch:"定義",pos:"n",s:"Clear definition."},
+                {en:"dense",ch:"濃密的",pos:"adj",s:"Dense forest."},
+                {en:"determination",ch:"決心",pos:"n",s:"Has determination."},
+                {en:"determine",ch:"決心",pos:"v",s:"Determine output."},
+                {en:"document",ch:"文件",pos:"n",s:"Word document."},
+                {en:"eastern",ch:"東部的",pos:"adj",s:"Eastern side."},
+                {en:"effective",ch:"有效的",pos:"adj",s:"Effective plan."},
+                {en:"element",ch:"要素",pos:"n",s:"Key element."},
+                {en:"emotional",ch:"情緒的",pos:"adj",s:"Emotional movie."},
+                {en:"environmental",ch:"環境的",pos:"adj",s:"Environmental protection."},
+                {en:"expert",ch:"專家",pos:"n",s:"Ask expert."},
+                {en:"impossible",ch:"不可能的",pos:"adj",s:"Mission impossible."},
+                {en:"influence",ch:"影響",pos:"v",s:"Bad influence."},
+                {en:"intense",ch:"激烈的",pos:"adj",s:"Intense heat."},
+                {en:"internal",ch:"內部的",pos:"adj",s:"Internal organs."},
+                {en:"investigate",ch:"調查",pos:"v",s:"Investigate crime."},
+                {en:"judge",ch:"判斷",pos:"v",s:"Judge me."},
+                {en:"management",ch:"管理",pos:"n",s:"Time management."},
+                {en:"manner",ch:"方式",pos:"n",s:"In a manner."},
+                {en:"massive",ch:"大量的",pos:"adj",s:"Massive crowd."},
+                {en:"native",ch:"本國的",pos:"adj",s:"Native speaker."},
+                {en:"northern",ch:"北部的",pos:"adj",s:"Northern lights."},
+                {en:"object",ch:"物體",pos:"n",s:"Flying object."},
+                {en:"obvious",ch:"明顯的",pos:"adj",s:"Obvious answer."},
+                {en:"particular",ch:"特定的",pos:"adj",s:"Particular one."},
+                {en:"particularly",ch:"特別地",pos:"adv",s:"Particularly good."},
+                {en:"poverty",ch:"貧窮",pos:"n",s:"End poverty."},
+                {en:"property",ch:"財產",pos:"n",s:"Private property."},
+                {en:"region",ch:"地區",pos:"n",s:"Cold region."},
+                {en:"relatively",ch:"相對地",pos:"adv",s:"Relatively small."},
+                {en:"resource",ch:"資源",pos:"n",s:"Natural resource."},
+                {en:"severe",ch:"嚴重的",pos:"adj",s:"Severe pain."},
+                {en:"soldier",ch:"士兵",pos:"n",s:"Brave soldier."},
+                {en:"soul",ch:"靈魂",pos:"n",s:"Heart and soul."},
+                {en:"southern",ch:"南部的",pos:"adj",s:"Southern part."},
+                {en:"therapy",ch:"治療",pos:"n",s:"Physical therapy."},
+                {en:"typical",ch:"典型的",pos:"adj",s:"Typical day."},
+                {en:"victim",ch:"受害者",pos:"n",s:"Help the victim."},
+                {en:"western",ch:"西部的",pos:"adj",s:"Western style."}
+            ]
+        };
+
+        // --- INIT STUDY MODE (FOLDABLE ACCORDION) ---
+        function initGrid(unitId, data) {
+            const container = document.getElementById('study-view');
+            
+            // Create Section Wrapper
+            const section = document.createElement('div');
+            section.className = 'unit-section';
+            section.id = `section-${unitId}`;
+            
+            // Header (Click to Toggle)
+            const header = document.createElement('div');
+            header.className = 'unit-header';
+            header.onclick = () => toggleUnit(unitId);
+            header.innerHTML = `
+                <div style="display:flex; align-items:center;">
+                    <span class="unit-title-text">${unitId} Vocabulary</span>
+                    <span class="unit-count">${data.length} Words</span>
+                </div>
+                <i class="fas fa-chevron-down accordion-icon"></i>
+            `;
+            
+            // Content (The Grid)
+            const content = document.createElement('div');
+            content.className = 'unit-content';
+            content.innerHTML = `
+                <div class="grid">
+                    ${data.map(w => `
+                        <div class="card">
+                            <div class="card-header">
+                                <span class="pos-tag">${w.pos}</span>
+                                <i class="fas fa-volume-up audio-icon" onclick="playAudio('${w.en}')"></i>
+                            </div>
+                            <div class="english-display">${w.en}</div>
+                            <div class="sentence">"${w.s}"</div>
+                            <div class="reveal-box" onclick="this.classList.toggle('revealed')">
+                                <div class="reveal-hint">TAP TO REVEAL</div>
+                                <div class="chinese-hidden">${w.ch}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            section.appendChild(header);
+            section.appendChild(content);
+            container.appendChild(section);
+        }
+
+        // Initialize all grids
+        initGrid('L2.09', VOCAB_DB['L2.09']);
+        initGrid('L2.10', VOCAB_DB['L2.10']);
+        initGrid('L2.11', VOCAB_DB['L2.11']);
+        initGrid('L2.12', VOCAB_DB['L2.12']);
+
+        // Open first unit by default
+        document.getElementById('section-L2.09').classList.add('active');
+
+        // --- ACCORDION LOGIC ---
+        function toggleUnit(unitId) {
+            const clickedSection = document.getElementById(`section-${unitId}`);
+            const isActive = clickedSection.classList.contains('active');
+            
+            // Close all others
+            document.querySelectorAll('.unit-section').forEach(sec => sec.classList.remove('active'));
+            
+            // Toggle clicked
+            if (!isActive) {
+                clickedSection.classList.add('active');
+                clickedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        // --- JUMP LOGIC ---
+        function jumpTo(unitId) {
+            // Activate the section
+            document.querySelectorAll('.unit-section').forEach(sec => sec.classList.remove('active'));
+            const targetSection = document.getElementById(`section-${unitId}`);
+            if(targetSection) {
+                targetSection.classList.add('active');
+                targetSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        // --- GAME LOGIC ---
+        let currentQueue = [];
+        let score = 0;
+        let selectedUnitKey = 'all';
+        let currentWord = null;
+
+        function switchMode(mode) {
+            document.getElementById('study-view').classList.add('hidden');
+            document.getElementById('challenge-view').classList.add('hidden');
+            document.getElementById('btn-study').classList.remove('active');
+            document.getElementById('btn-challenge').classList.remove('active');
+
+            if(mode === 'study') {
+                document.getElementById('study-view').classList.remove('hidden');
+                document.getElementById('btn-study').classList.add('active');
+            } else {
+                document.getElementById('challenge-view').classList.remove('hidden');
+                document.getElementById('btn-challenge').classList.add('active');
+                // Reset UI
+                document.getElementById('setup-screen').classList.remove('hidden');
+                document.getElementById('game-screen').style.display = 'none';
+                document.getElementById('result-screen').style.display = 'none';
+            }
+        }
+
+        function selectUnit(btn, unit) {
+            selectedUnitKey = unit;
+            // Visual feedback
+            document.querySelectorAll('.unit-select-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        }
+
+        function startChallenge() {
+            // Build Queue
+            if(selectedUnitKey === 'all') {
+                currentQueue = [...VOCAB_DB['L2.09'], ...VOCAB_DB['L2.10'], ...VOCAB_DB['L2.11'], ...VOCAB_DB['L2.12']];
+            } else {
+                currentQueue = [...VOCAB_DB[selectedUnitKey]];
+            }
+            
+            // Shuffle
+            currentQueue.sort(() => Math.random() - 0.5);
+            // Limit to 20 words per session for bite-sized practice
+            currentQueue = currentQueue.slice(0, 20);
+            
+            score = 0;
+            
+            // Switch UI
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').style.display = 'block';
+            
+            loadNextCard();
+        }
+
+        function loadNextCard() {
+            if(currentQueue.length === 0) {
+                endGame();
+                return;
+            }
+
+            currentWord = currentQueue.pop();
+            
+            // Reset UI
+            document.getElementById('game-pos').innerText = currentWord.pos;
+            document.getElementById('game-chinese').innerText = currentWord.ch;
+            
+            // Reset Input
+            const input = document.getElementById('game-input');
+            input.value = "";
+            input.disabled = false;
+            input.classList.remove('correct', 'wrong');
+            input.focus();
+
+            // Reset view state
+            document.getElementById('input-area').style.display = 'block';
+            document.getElementById('feedback-area').style.display = 'none';
+            
+            updateProgress();
+        }
+
+        function checkAnswer() {
+            const input = document.getElementById('game-input');
+            const userVal = input.value.trim().toLowerCase();
+            const correctVal = currentWord.en.toLowerCase();
+            const isCorrect = userVal === correctVal;
+            
+            // UI Updates
+            input.disabled = true;
+            document.getElementById('input-area').style.display = 'none';
+            document.getElementById('feedback-area').style.display = 'block';
+            
+            const title = document.getElementById('feedback-title');
+            const display = document.getElementById('correct-answer');
+            const sentenceDisplay = document.getElementById('feedback-sentence');
+            
+            if(isCorrect) {
+                score += 10;
+                title.innerText = "Correct!";
+                title.className = "feedback-title feedback-correct";
+                display.innerText = currentWord.en;
+                input.classList.add('correct');
+                playAudio(correctVal); // Reward audio
+            } else {
+                title.innerText = "Nice try!";
+                title.className = "feedback-title feedback-wrong";
+                display.innerText = "Answer: " + currentWord.en;
+                input.classList.add('wrong');
+                playAudio(correctVal); // Correction audio
+            }
+            
+            // Show sentence
+            sentenceDisplay.innerText = `"${currentWord.s}"`;
+            
+            // Auto focus next button
+            document.getElementById('next-btn').focus();
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('game-input').addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                checkAnswer();
+            }
+        });
+
+        function nextCard() {
+            loadNextCard();
+        }
+
+        function updateProgress() {
+            const total = 20; // Fixed session length
+            const left = currentQueue.length;
+            const pct = ((total - left) / total) * 100;
+            document.getElementById('progress-fill').style.width = pct + "%";
+        }
+
+        function playGameAudio() {
+            if(currentWord) playAudio(currentWord.en);
+        }
+
+        function endGame() {
+            document.getElementById('game-screen').style.display = 'none';
+            document.getElementById('result-screen').style.display = 'flex';
+            document.getElementById('cert-score').innerText = score;
+
+            if (GOOGLE_FORM_URL) {
+                document.getElementById('submit-link').href = GOOGLE_FORM_URL;
+                document.getElementById('submit-link').style.display = 'inline-flex';
+            } else {
+                document.getElementById('submit-link').style.display = 'none';
+            }
+        }
+
+        // --- AUDIO ENGINE ---
+        function playAudio(word) {
+            showToast();
+            // 1. Try to fetch real human audio from Dictionary API
+            fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`)
+                .then(r => r.json())
+                .then(d => {
+                    const audio = d[0]?.phonetics.find(p => p.audio)?.audio;
+                    if(audio) new Audio(audio).play();
+                    else speakFallback(word);
+                })
+                .catch(() => speakFallback(word));
+        }
+
+        function speakFallback(word) {
+            const u = new SpeechSynthesisUtterance(word);
+            u.lang = 'en-GB'; // British English preference
+            window.speechSynthesis.speak(u);
+        }
+
+        function showToast() {
+            const t = document.getElementById('toast');
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 1500);
+        }
+
+    </script>
+</body>
+</html>
