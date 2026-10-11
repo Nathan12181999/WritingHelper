@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Writing Focus Marking</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        /* --- CORE THEME --- */
+        :root {
+            --navy: #0f172a;
+            --navy-light: #1e293b;
+            --gold: #d4af37;
+            --gold-light: #f3e5ab;
+            --white: #ffffff;
+            --bg: #f1f5f9;
+            --line: #e2e8f0;
+            --muted: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --focus: #7c3aed;
+            --focus-bg: #f5f3ff;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: var(--navy); padding-bottom: 80px; overflow-x: hidden; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+        .hidden { display: none !important; }
+        h2 { font-size: 1.25rem; margin-bottom: 4px; }
+        h3 { font-size: 1.05rem; margin-bottom: 8px; }
+        .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 14px; }
+        .zh { color: var(--muted); font-weight: 500; font-size: 0.85em; }
+
+        /* --- BUTTONS / INPUTS --- */
+        .btn { cursor: pointer; border: none; outline: none; transition: 0.2s; font-weight: 700; border-radius: 8px; padding: 9px 14px; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; touch-action: manipulation; }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: var(--navy); color: var(--white); }
+        .btn-gold { background: var(--gold); color: var(--navy); }
+        .btn-light { background: var(--white); color: var(--navy); border: 1px solid #cbd5e1; }
+        .btn-danger { background: #fee2e2; color: #b91c1c; }
+        .btn-sm { padding: 5px 9px; font-size: 0.78rem; }
+        input[type=text], input[type=password], input[type=number], select, textarea {
+            width: 100%; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.92rem; color: var(--navy); background: var(--white);
+        }
+        textarea { resize: vertical; min-height: 70px; line-height: 1.45; }
+        label.f { display: block; font-size: 0.8rem; font-weight: 700; color: var(--navy-light); margin: 10px 0 4px; }
+        .row { display: flex; gap: 12px; flex-wrap: wrap; }
+        .row > * { flex: 1 1 180px; }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+
+        /* --- HEADER / TABS --- */
+        header { background: var(--navy); color: var(--white); padding: 10px 0; position: sticky; top: 0; z-index: 100; border-bottom: 4px solid var(--gold); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .logo { font-size: 1.15rem; font-weight: 800; color: var(--gold); letter-spacing: 1px; white-space: nowrap; }
+        .tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.1); padding: 4px; border-radius: 50px; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab-btn { padding: 6px 12px; border-radius: 40px; color: var(--white); background: transparent; font-size: 0.8rem; cursor: pointer; border: none; white-space: nowrap; font-weight: 600; }
+        .tab-btn.active { background: var(--gold); color: var(--navy); }
+        main { padding-top: 18px; }
+
+        /* --- CARDS --- */
+        .card { background: var(--white); border-radius: 12px; padding: 18px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 16px; border-left: 5px solid var(--gold); }
+        .card.plain { border-left-color: var(--white); }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+        .pill { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; background: var(--bg); color: var(--muted); }
+        .pill.ok { background: #d1fae5; color: #047857; }
+        .pill.warn { background: #fef3c7; color: #92400e; }
+        .pill.focus { background: var(--focus-bg); color: var(--focus); }
+        .notice { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; color: #92400e; margin-bottom: 12px; }
+        .empty { text-align: center; color: var(--muted); padding: 30px 10px; font-size: 0.9rem; }
+
+        /* --- FOCUS CHIPS --- */
+        .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+        .chip { border: 2px solid #cbd5e1; background: var(--white); border-radius: 20px; padding: 5px 11px; font-size: 0.8rem; font-weight: 700; cursor: pointer; color: var(--navy); }
+        .chip.on { border-color: var(--focus); background: var(--focus); color: var(--white); }
+        .chip.locked { cursor: default; }
+
+        /* --- UPLOAD --- */
+        .dropzone { border: 2px dashed #94a3b8; border-radius: 12px; padding: 26px 14px; text-align: center; background: #f8fafc; cursor: pointer; transition: 0.2s; }
+        .dropzone.drag { border-color: var(--gold); background: #fffbeb; }
+        .dropzone i { font-size: 2rem; color: var(--gold); margin-bottom: 8px; }
+        .queue-item { display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-top: 10px; background: var(--white); flex-wrap: wrap; }
+        .thumbs { display: flex; gap: 6px; flex-wrap: wrap; }
+        .thumb { width: 64px; height: 84px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); cursor: zoom-in; background: #fff; }
+        .queue-meta { flex: 1 1 220px; }
+        .status-line { font-size: 0.8rem; margin-top: 6px; color: var(--muted); }
+        .status-line.err { color: var(--danger); }
+        .status-line.done { color: var(--success); font-weight: 700; }
+
+        /* --- TABLES --- */
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+        th { background: #f8fafc; font-size: 0.75rem; text-transform: uppercase; color: var(--muted); letter-spacing: 0.3px; white-space: nowrap; }
+        tr.clickable { cursor: pointer; }
+        tr.clickable:hover td { background: #f8fafc; }
+        td.num { text-align: center; }
+        .heat { text-align: center; font-weight: 700; border-radius: 4px; }
+
+        /* --- MARKED SCRIPT --- */
+        .script { font-family: 'Times New Roman', Georgia, serif; font-size: 1.12rem; line-height: 2.9; background: var(--white); padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px; }
+        .script p { text-indent: 2em; margin-bottom: 4px; }
+        .err { position: relative; white-space: nowrap; }
+        .err .tag { position: absolute; left: 0; top: -1.35em; font-family: 'Segoe UI', sans-serif; font-size: 0.62rem; font-weight: 800; line-height: 1; white-space: nowrap; }
+        .err.focus { color: var(--focus); }
+        .err.focus .br { color: var(--focus); font-weight: 800; }
+        .err.focus .tag { color: var(--focus); }
+        .err .blank { display: inline-block; min-width: 70px; border-bottom: 1px solid currentColor; }
+        .err .fix { color: #047857; font-weight: 700; }
+        .err.other { text-decoration: underline wavy #94a3b8; text-underline-offset: 4px; }
+        .err.other .tag { color: #64748b; }
+        .err.sel { background: #fef9c3; border-radius: 3px; }
+        .strike { text-decoration: line-through; text-decoration-thickness: 2px; }
+        .caret { font-weight: 800; color: var(--focus); }
+        .viewbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+        .viewbar .chip.on { background: var(--navy); border-color: var(--navy); }
+        .scan-col img { width: 100%; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; cursor: zoom-in; }
+        .err-table input, .err-table select { padding: 5px 6px; font-size: 0.8rem; }
+        .err-table td { min-width: 70px; }
+        .err-table tr.off td { opacity: 0.45; }
+        .legend { font-size: 0.8rem; line-height: 1.7; }
+
+        /* --- BARS --- */
+        .bar-row { display: grid; grid-template-columns: 130px 1fr 70px; gap: 8px; align-items: center; font-size: 0.82rem; margin-bottom: 6px; }
+        .bar-track { background: var(--bg); height: 14px; border-radius: 7px; position: relative; overflow: hidden; }
+        .bar-fill { background: var(--focus); height: 100%; border-radius: 7px; }
+        .bar-avg { position: absolute; top: -2px; bottom: -2px; width: 3px; background: var(--gold); }
+        .bar-row.weak .bar-fill { background: var(--danger); }
+        .bar-row.strong .bar-fill { background: var(--success); }
+
+        /* --- MODAL --- */
+        .modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 500; display: flex; align-items: flex-start; justify-content: center; padding: 30px 12px; overflow-y: auto; }
+        .modal { background: var(--white); border-radius: 12px; max-width: 900px; width: 100%; padding: 20px; position: relative; }
+        .modal-close { position: absolute; top: 10px; right: 12px; background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--muted); }
+        .lightbox img { max-width: 100%; display: block; margin: 0 auto; }
+
+        /* --- WORKSHEET --- */
+        .ws h1 { font-size: 1.4rem; margin-bottom: 4px; }
+        .ws h2 { font-size: 1.1rem; margin: 18px 0 6px; border-bottom: 2px solid var(--navy); padding-bottom: 3px; }
+        .ws .rule { background: #f8fafc; border-left: 3px solid var(--gold); padding: 8px 10px; font-size: 0.92rem; margin-bottom: 8px; }
+        .ws ol { padding-left: 24px; }
+        .ws li { margin-bottom: 12px; line-height: 1.6; }
+        .ws .ans-line { display: block; border-bottom: 1px solid #94a3b8; height: 1.6em; margin-top: 4px; }
+        .ws .key li { margin-bottom: 4px; }
+        .ws .page-break { page-break-before: always; }
+
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.95); color: white; padding: 12px 22px; border-radius: 30px; opacity: 0; pointer-events: none; transition: 0.3s; z-index: 2000; font-weight: 600; font-size: 0.9rem; max-width: 90vw; text-align: center; }
+        .toast.show { opacity: 1; bottom: 50px; }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #print-area { display: none; }
+        @media print {
+            body { background: white; padding: 0; }
+            body > *:not(#print-area) { display: none !important; }
+            #print-area { display: block !important; padding: 0 6mm; }
+            .script { border: none; padding: 0; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="container header-inner">
+            <div class="logo"><i class="fas fa-pen-nib"></i> Writing Focus Marking</div>
+            <nav class="tabs" id="tabs">
+                <button class="tab-btn active" data-tab="mark"><i class="fas fa-upload"></i> Mark 批改</button>
+                <button class="tab-btn" data-tab="scripts"><i class="fas fa-file-lines"></i> Scripts 文章</button>
+                <button class="tab-btn" data-tab="students"><i class="fas fa-user-graduate"></i> Individual 個別差異</button>
+                <button class="tab-btn" data-tab="common"><i class="fas fa-users"></i> Common Mistakes 全班</button>
+                <button class="tab-btn" data-tab="library"><i class="fas fa-book"></i> Rubrics &amp; Examples</button>
+                <button class="tab-btn" data-tab="settings"><i class="fas fa-gear"></i> Settings</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <!-- === 1. MARK === -->
+        <section id="tab-mark">
+            <div id="key-warning" class="notice hidden"><i class="fas fa-key"></i> Add your Claude API key in <b>Settings</b> before marking. 請先喺 Settings 輸入 API key。</div>
+
+            <div class="card">
+                <h2>1. Writing task 寫作題目</h2>
+                <p class="sub">These details are saved with every script you mark in this batch.</p>
+                <div class="row">
+                    <div><label class="f">Task title</label><input type="text" id="task-title" placeholder="e.g. T1 Letter to the Principal"></div>
+                    <div><label class="f">Level</label>
+                        <select id="task-level"><option>S1</option><option>S2</option><option>S3</option><option>S4</option><option>S5</option><option>S6</option></select>
+                    </div>
+                    <div><label class="f">Class</label><input type="text" id="task-class" placeholder="e.g. 2A"></div>
+                </div>
+                <label class="f">Question / instructions given to students (optional)</label>
+                <textarea id="task-prompt" placeholder="Paste the writing question so the AI can comment on content and task fulfilment."></textarea>
+
+                <label class="f">Focus areas 批改重點 <span class="zh">— VF is the mandatory core focus; add one more only if the group performs VERY WELL in VF.</span></label>
+                <div class="chips" id="focus-chips"></div>
+            </div>
+
+            <div class="card">
+                <h2>2. Upload scanned scripts 上載掃描文章</h2>
+                <p class="sub">JPG / PNG photos or PDF scans. Each file becomes one student's script (a multi-page PDF stays together). Use <b>+ page</b> to add more pages to a script.</p>
+                <div class="dropzone" id="dropzone">
+                    <i class="fas fa-cloud-arrow-up"></i>
+                    <div><b>Tap to choose files</b> or drag &amp; drop here</div>
+                    <div class="sub" style="margin:4px 0 0;">Images are resized on this device before upload.</div>
+                </div>
+                <input type="file" id="file-input" accept="image/*,application/pdf" multiple hidden>
+                <input type="file" id="page-input" accept="image/*,application/pdf" multiple hidden>
+                <div id="queue"></div>
+                <div class="actions">
+                    <button class="btn btn-gold" id="mark-all-btn"><i class="fas fa-wand-magic-sparkles"></i> Mark all with AI</button>
+                    <button class="btn btn-light" id="clear-queue-btn"><i class="fas fa-trash"></i> Clear list</button>
+                    <span class="sub" style="margin:0;" id="queue-summary"></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- === 2. SCRIPTS === -->
+        <section id="tab-scripts" class="hidden">
+            <div id="scripts-list-view">
+                <div class="card plain">
+                    <h2>Marked scripts 已批改文章</h2>
+                    <div class="row" style="margin-top:8px;">
+                        <div><label class="f">Task</label><select id="filter-task"></select></div>
+                        <div><label class="f">Class</label><select id="filter-class"></select></div>
+                        <div><label class="f">Search student</label><input type="text" id="filter-name" placeholder="Name or class no."></div>
+                    </div>
+                    <div class="table-wrap" style="margin-top:12px;"><table id="scripts-table"></table></div>
+                </div>
+            </div>
+            <div id="script-detail" class="hidden"></div>
+        </section>
+
+        <!-- === 3. STUDENTS / INDIVIDUAL DIFFERENCES === -->
+        <section id="tab-students" class="hidden">
+            <div class="card plain">
+                <h2>Individual differences 個別差異</h2>
+                <p class="sub">Error rates are per 100 words so short and long scripts compare fairly. The gold line is the class average. Red = clearly above class average (needs strengthening); green = clearly below (relative strength).</p>
+                <div class="row">
+                    <div><label class="f">Class</label><select id="ind-class"></select></div>
+                    <div><label class="f">Task</label><select id="ind-task"></select></div>
+                </div>
+                <h3 style="margin-top:16px;">Class overview <span class="zh">— errors per 100 words, click a student</span></h3>
+                <div class="table-wrap"><table id="heat-table"></table></div>
+            </div>
+            <div id="student-profile"></div>
+        </section>
+
+        <!-- === 4. COMMON MISTAKES === -->
+        <section id="tab-common" class="hidden">
+            <div class="card plain">
+                <h2>Common mistakes exercise 全班常見錯誤練習</h2>
+                <p class="sub">Pick real errors from the class (names are never shown on the worksheet) and turn them into an exercise. Build it instantly from the errors, or let AI add rule explanations and fresh practice items.</p>
+                <div class="row">
+                    <div><label class="f">Class</label><select id="cm-class"></select></div>
+                    <div><label class="f">Task</label><select id="cm-task"></select></div>
+                    <div><label class="f">Show</label>
+                        <select id="cm-scope"><option value="focus">Focus-area errors only</option><option value="all">All error types</option></select>
+                    </div>
+                </div>
+                <h3 style="margin-top:16px;">Most frequent error types</h3>
+                <div id="cm-chart"></div>
+            </div>
+
+            <div class="card">
+                <h3>Choose sentences for the worksheet <span class="zh">(most common types first)</span></h3>
+                <div class="actions" style="margin-top:0; margin-bottom:8px;">
+                    <button class="btn btn-light btn-sm" id="cm-auto">Auto-pick (3 per top type)</button>
+                    <button class="btn btn-light btn-sm" id="cm-none">Clear selection</button>
+                    <span class="sub" style="margin:0;" id="cm-count"></span>
+                </div>
+                <div class="table-wrap" style="max-height:420px; overflow-y:auto;"><table id="cm-table"></table></div>
+                <div class="row" style="margin-top:12px;">
+                    <div><label class="f">Exercise type</label>
+                        <select id="cm-type">
+                            <option value="correct">Find &amp; correct the error</option>
+                            <option value="gap">Gap fill</option>
+                            <option value="mixed">Mixed (correction + gap fill + rewrite)</option>
+                        </select>
+                    </div>
+                    <div><label class="f">New practice items per error type (AI)</label><input type="number" id="cm-n" value="5" min="2" max="15"></div>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-primary" id="cm-build"><i class="fas fa-list-check"></i> Build from class errors</button>
+                    <button class="btn btn-gold" id="cm-ai"><i class="fas fa-wand-magic-sparkles"></i> AI exercise with rules &amp; practice</button>
+                </div>
+            </div>
+
+            <div class="card plain">
+                <h3>Saved exercises</h3>
+                <div id="ex-list"></div>
+            </div>
+        </section>
+
+        <!-- === 5. LIBRARY === -->
+        <section id="tab-library" class="hidden">
+            <div class="card">
+                <h2>Error codes 錯誤代號 (Simplified Error Codes for Writing Tasks)</h2>
+                <p class="sub">Built in from the panel's focus-marking rubric. Sub-categories are for teachers' reference only — handwritten drafts are marked with main categories.</p>
+                <div class="table-wrap"><table id="code-table"></table></div>
+                <label class="f" style="margin-top:14px;">Extra marking notes for the AI <span class="zh">(e.g. "S1: accept simple present for habits", "Don't penalise British/American spelling differences")</span></label>
+                <textarea id="rubric-notes"></textarea>
+                <div class="actions"><button class="btn btn-primary btn-sm" id="save-notes"><i class="fas fa-floppy-disk"></i> Save notes</button></div>
+            </div>
+
+            <div class="card">
+                <h2>Upload rubrics, examples &amp; templates 上載評分準則／範文／範本</h2>
+                <p class="sub">PDF, images or text files. Tick <b>Marking</b> to send an item to the AI with every script (e.g. a content/organisation rubric or a model essay). Tick <b>Exercise</b> to use it as a template when generating class exercises.</p>
+                <div class="row">
+                    <div><label class="f">Type</label>
+                        <select id="lib-kind">
+                            <option value="rubric">Rubric / marking scheme</option>
+                            <option value="example">Example / model essay</option>
+                            <option value="template">Exercise template</option>
+                            <option value="feedback">Feedback template</option>
+                        </select>
+                    </div>
+                    <div><label class="f">Title</label><input type="text" id="lib-title" placeholder="e.g. S2 Letter rubric"></div>
+                    <div><label class="f">Level (optional)</label><input type="text" id="lib-level" placeholder="e.g. S2"></div>
+                </div>
+                <label class="f">Notes (optional) <span class="zh">— e.g. "Level 5 sample", "Use this layout for worksheets"</span></label>
+                <input type="text" id="lib-note">
+                <label class="f">Paste text instead of a file (optional)</label>
+                <textarea id="lib-text" placeholder="Paste a rubric, model essay or exercise template here…"></textarea>
+                <div class="actions">
+                    <button class="btn btn-light" id="lib-file-btn"><i class="fas fa-paperclip"></i> Choose file(s)</button>
+                    <button class="btn btn-primary" id="lib-add-text"><i class="fas fa-plus"></i> Save pasted text</button>
+                    <input type="file" id="lib-file" accept="application/pdf,image/*,.txt,.md,.csv" multiple hidden>
+                </div>
+            </div>
+
+            <div class="card plain">
+                <h3>Library 資源庫</h3>
+                <div class="table-wrap"><table id="lib-table"></table></div>
+            </div>
+        </section>
+
+        <!-- === 6. SETTINGS === -->
+        <section id="tab-settings" class="hidden">
+            <div class="card">
+                <h2>AI connection</h2>
+                <p class="sub">The key is kept only in this browser and is sent straight to Anthropic when you mark. Scanned scripts are sent to the Claude API for reading and marking.</p>
+                <label class="f">Claude API key</label>
+                <input type="password" id="set-key" placeholder="sk-ant-..." autocomplete="off">
+                <div class="row">
+                    <div><label class="f">Model</label>
+                        <select id="set-model">
+                            <option value="claude-opus-5-5">Claude Opus 5.5 (most accurate)</option>
+                            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (faster, cheaper)</option>
+                            <option value="claude-haiku-5-5">Claude Haiku 5.5 (cheapest)</option>
+                        </select>
+                    </div>
+                    <div><label class="f">Thoroughness (effort)</label>
+                        <select id="set-effort">
+                            <option value="medium">Medium</option>
+                            <option value="high">High (recommended for marking)</option>
+                            <option value="xhigh">Extra high</option>
+                        </select>
+                    </div>
+                </div>
+                <label class="f"><input type="checkbox" id="set-show-other"> Show non-focus errors on the student copy (normally hidden in focus marking)</label>
+                <div class="actions"><button class="btn btn-primary" id="save-settings"><i class="fas fa-floppy-disk"></i> Save settings</button></div>
+            </div>
+
+            <div class="card">
+                <h2>Class list 學生名單</h2>
+                <p class="sub">One student per line: <code>class, class no., name</code> — e.g. <code>2A, 5, Chan Tai Man</code>. Existing students with the same class and number are updated.</p>
+                <textarea id="roster-input" rows="6" placeholder="2A, 1, Au Ka Yan&#10;2A, 2, Chan Tsz Hin"></textarea>
+                <div class="actions"><button class="btn btn-primary" id="roster-add"><i class="fas fa-user-plus"></i> Add / update students</button></div>
+                <div class="table-wrap" style="margin-top:12px; max-height:300px; overflow-y:auto;"><table id="roster-table"></table></div>
+            </div>
+
+            <div class="card">
+                <h2>Backup 備份</h2>
+                <p class="sub">All data lives in this browser only. Export regularly, and import the file on another computer to continue there.</p>
+                <div class="actions">
+                    <button class="btn btn-light" id="export-btn"><i class="fas fa-download"></i> Export backup</button>
+                    <button class="btn btn-light" id="import-btn"><i class="fas fa-upload"></i> Import backup</button>
+                    <input type="file" id="import-file" accept="application/json" hidden>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal-root"></div>
+    <div id="print-area"></div>
+    <div id="toast" class="toast"></div>
+
+    <script>
+    // ================================================================
+    // RUBRIC: Simplified Error Codes for Writing Tasks (focus marking)
+    // ================================================================
+    const CODES = {
+        VF:   { label: '[VF]',  tag: 'VF',  name: 'Verb form', zh: '動詞形式',
+                subs: { 'VF': '1a Non-existent verb form', 'VF-ag': '1b Subject-verb agreement' },
+                rule: 'Use a verb form that exists and agrees with its subject: he goes / they go; was (singular) vs were (plural); did + base form (did not go, not did not went).' },
+        VT:   { label: '[VT]',  tag: 'VT',  name: 'Verb tense (a matter of choice, not form)', zh: '時態',
+                subs: {},
+                rule: 'Choose the tense that matches the time: past events → past tense; facts and habits → present simple; actions in progress at a moment → continuous.' },
+        NV:   { label: '[NV]',  tag: 'NV',  name: 'Non-finite verbs', zh: '非限定動詞',
+                subs: { 'NV-g': '3a Gerund', 'NV-i': '3b Infinitive / to-infinitive', 'NV-p': '3c Participle' },
+                rule: 'After certain verbs and prepositions use a gerund (enjoy reading, interested in joining); after others use to + base form (decide to go); after modals use the base form (can swim); use -ed / -ing participles correctly (bored vs boring).' },
+        SCP:  { label: '[SCP]', tag: 'SCP', name: 'Spelling / capitalisation / punctuation', zh: '串字／大楷／標點',
+                subs: {},
+                rule: 'Check spelling, start sentences and proper nouns with a capital letter, and end each sentence with the correct punctuation.' },
+        WW:   { label: '[WW]',  tag: 'WW',  name: 'Wrong word', zh: '用錯字',
+                subs: { 'WW': '5a Meaning / degree / tone / article', 'WW-pos': '5b Part of speech', 'WW-prep': '5c Preposition', 'WW-num': '5d Singular or plural' },
+                rule: 'Pick the word with the right meaning, part of speech (happy / happiness / happily), preposition (good at, interested in) and number (many students, a lot of homework).' },
+        MISS: { label: '[^]',   tag: '^',   name: 'Missing word(s)', zh: '漏字',
+                subs: {},
+                rule: 'Every sentence needs all its parts: a subject, a verb, and the small words (articles, prepositions, "to") that link them.' },
+        RED:  { label: '[strikethrough]', tag: '—', name: 'Redundancy or wordiness', zh: '多餘字',
+                subs: {},
+                rule: 'Remove words that repeat meaning or are not needed (e.g. "return back", "the nature" when speaking in general).' },
+        ST:   { label: '{ST}',  tag: 'ST',  name: 'Structurally wrong or unnatural', zh: '句子結構',
+                subs: {},
+                rule: 'Build sentences with a clear structure: join clauses with suitable connectives, avoid run-on sentences and avoid translating Chinese word order directly.' },
+        IU:   { label: '{IU}',  tag: 'IU',  name: 'Illogical or unintelligible', zh: '不合邏輯／難以理解',
+                subs: {},
+                rule: 'Make sure each sentence makes sense on its own and follows logically from the one before.' }
+    };
+    const CODE_KEYS = Object.keys(CODES);
+    const SUB_KEYS = [...new Set(CODE_KEYS.flatMap(k => Object.keys(CODES[k].subs)))];
+    const SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.129.0/+esm';
+    const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // ================================================================
+    // STORAGE (IndexedDB key/value)
+    // ================================================================
+    const DB = {
+        db: null,
+        open() {
+            return new Promise((res, rej) => {
+                const r = indexedDB.open('writing-focus-marking', 1);
+                r.onupgradeneeded = () => r.result.createObjectStore('kv');
+                r.onsuccess = () => { this.db = r.result; res(); };
+                r.onerror = () => rej(r.error);
+            });
+        },
+        tx(mode) { return this.db.transaction('kv', mode).objectStore('kv'); },
+        req(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+        get(k) { return this.req(this.tx('readonly').get(k)); },
+        set(k, v) { return this.req(this.tx('readwrite').put(v, k)); },
+        del(k) { return this.req(this.tx('readwrite').delete(k)); },
+        prefix(p) { return this.req(this.tx('readonly').getAll(IDBKeyRange.bound(p, p + '￿'))); },
+        clear() { return this.req(this.tx('readwrite').clear()); }
+    };
+
+    const state = {
+        settings: { apiKey: '', model: 'claude-opus-5-5', effort: 'high', showOther: false, notes: '',
+                    focus: ['VF'], taskTitle: '', taskLevel: 'S2', taskClass: '', taskPrompt: '' },
+        students: [],
+        subs: [],
+        lib: [],
+        ex: [],
+        queue: [],
+        openSubId: null,
+        view: 'teacher',
+        cmSelected: new Set(),
+        profileStudent: null,
+    };
+
+    const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const $ = id => document.getElementById(id);
+    const saveSettings = () => DB.set('settings', state.settings);
+    const saveStudents = () => DB.set('students', state.students);
+    const saveSub = s => DB.set('sub:' + s.id, s);
+    const studentName = id => { const s = state.students.find(x => x.id === id); return s ? `${s.cls} ${s.no} ${s.name}` : 'Unassigned'; };
+    const studentOf = sub => state.students.find(x => x.id === sub.studentId);
+    const wordCount = t => (String(t || '').match(/[A-Za-z0-9'’-]+/g) || []).length;
+
+    function toast(msg, ms = 2200) {
+        const t = $('toast'); t.textContent = msg; t.classList.add('show');
+        clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms);
+    }
+
+    // ================================================================
+    // TABS
+    // ================================================================
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        document.querySelectorAll('main > section').forEach(s => s.classList.toggle('hidden', s.id !== 'tab-' + tab));
+        if (tab === 'scripts') renderScriptsList();
+        if (tab === 'students') renderStudents();
+        if (tab === 'common') renderCommon();
+        if (tab === 'library') renderLibrary();
+        if (tab === 'settings') renderSettings();
+        if (tab === 'mark') renderMark();
+        window.scrollTo(0, 0);
+    }
+    $('tabs').addEventListener('click', e => { const b = e.target.closest('.tab-btn'); if (b) switchTab(b.dataset.tab); });
+
+    // ================================================================
+    // IMAGE / PDF PROCESSING
+    // ================================================================
+    function loadScript(src) {
+        return new Promise((res, rej) => {
+            if (document.querySelector(`script[src="${src}"]`)) return res();
+            const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src));
+            document.head.appendChild(s);
+        });
+    }
+
+    function canvasToJpeg(source, w, h, maxSide = 1800) {
+        const scale = Math.min(1, maxSide / Math.max(w, h));
+        const c = document.createElement('canvas');
+        c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(source, 0, 0, c.width, c.height);
+        return c.toDataURL('image/jpeg', 0.85);
+    }
+
+    function imageFileToJpeg(file, maxSide) {
+        return new Promise((res, rej) => {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => { URL.revokeObjectURL(url); res(canvasToJpeg(img, img.naturalWidth, img.naturalHeight, maxSide)); };
+            img.onerror = () => { URL.revokeObjectURL(url); rej(new Error(`${file.name}: this image format can't be read here. Please use JPG, PNG or PDF.`)); };
+            img.src = url;
+        });
+    }
+
+    async function pdfToJpegs(file, maxSide = 1800) {
+        await loadScript(PDFJS_URL);
+        pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+        const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+        const pages = [];
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const v1 = page.getViewport({ scale: 1 });
+            const vp = page.getViewport({ scale: maxSide / Math.max(v1.width, v1.height) });
+            const c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height;
+            await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+            pages.push(c.toDataURL('image/jpeg', 0.85));
+        }
+        return pages;
+    }
+
+    async function fileToPages(file) {
+        if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) return pdfToJpegs(file);
+        return [await imageFileToJpeg(file)];
+    }
+
+    const fileToBase64 = file => new Promise((res, rej) => {
+        const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = () => rej(r.error); r.readAsDataURL(file);
+    });
+
+    // ================================================================
+    // CLAUDE API
+    // ================================================================
+    let sdkPromise = null;
+    async function callClaude({ system, content, schema, maxTokens = 32000 }) {
+        if (!state.settings.apiKey) throw new Error('No API key — add it in Settings.');
+        sdkPromise = sdkPromise || import(SDK_URL);
+        const { default: Anthropic } = await sdkPromise;
+        const client = new Anthropic({ apiKey: state.settings.apiKey, dangerouslyAllowBrowser: true });
+        const model = state.settings.model;
+        const params = {
+            model,
+            max_tokens: maxTokens,
+            thinking: { type: 'adaptive' },
+            output_config: { effort: state.settings.effort, format: { type: 'json_schema', schema } },
+            system,
+            messages: [{ role: 'user', content }],
+        };
+        let msg;
+        if (model === 'claude-opus-5-5' || model === 'claude-sonnet-5-5') {
+            // If a safety classifier declines, retry server-side on a suitable model.
+            msg = await client.beta.messages.stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }).finalMessage();
+        } else {
+            msg = await client.messages.stream(params).finalMessage();
+        }
+        if (msg.stop_reason === 'refusal') throw new Error('The AI declined this request' + (msg.stop_details?.explanation ? ': ' + msg.stop_details.explanation : '.'));
+        if (msg.stop_reason === 'max_tokens') throw new Error('The answer was too long and got cut off. Try fewer pages at once.');
+        const text = msg.content.filter(b => b.type === 'text').map(b => b.text).join('');
+        return JSON.parse(text);
+    }
+
+    function friendlyError(e) {
+        const m = String(e?.message || e);
+        if (e?.status === 401 || /authentication|invalid x-api-key/i.test(m)) return 'API key not accepted — check it in Settings.';
+        if (e?.status === 429) return 'Rate limit reached — wait a minute and try again.';
+        if (e?.status === 529 || /overloaded/i.test(m)) return 'The AI service is busy — try again shortly.';
+        if (/Failed to fetch|NetworkError|Could not load/i.test(m)) return 'Network problem — check the internet connection.';
+        return m;
+    }
+
+    function rubricText() {
+        const lines = CODE_KEYS.map(k => {
+            const c = CODES[k];
+            const subs = Object.entries(c.subs).map(([s, d]) => `${s} = ${d}`).join('; ');
+            return `- ${k} ${c.label}: ${c.name}${subs ? ' (sub-codes: ' + subs + ')' : ''}`;
+        });
+        return lines.join('\n');
+    }
+
+    function libraryBlocks(flag) {
+        const items = state.lib.filter(l => l[flag]);
+        const blocks = [];
+        for (const l of items) {
+            const head = `Reference (${l.kind}${l.level ? ', ' + l.level : ''}): "${l.title}"${l.note ? ' — ' + l.note : ''}`;
+            if (l.mime === 'application/pdf') {
+                blocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: l.data }, title: l.title.slice(0, 200) });
+                blocks.push({ type: 'text', text: '↑ ' + head });
+            } else if (l.mime?.startsWith('image/')) {
+                blocks.push({ type: 'text', text: head + ' ↓' });
+                blocks.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: l.data.split(',')[1] } });
+            } else {
+                blocks.push({ type: 'text', text: `${head}\n<reference>\n${l.text}\n</reference>` });
+            }
+        }
+        if (blocks.length) blocks[blocks.length - 1].cache_control = { type: 'ephemeral' };
+        return blocks;
+    }
+
+    // ================================================================
+    // MARK TAB
+    // ================================================================
+    function renderMark() {
+        const s = state.settings;
+        $('key-warning').classList.toggle('hidden', !!s.apiKey);
+        $('task-title').value = s.taskTitle; $('task-level').value = s.taskLevel;
+        $('task-class').value = s.taskClass; $('task-prompt').value = s.taskPrompt;
+        $('focus-chips').innerHTML = CODE_KEYS.map(k => `
+            <button class="chip ${s.focus.includes(k) ? 'on' : ''} ${k === 'VF' ? 'locked' : ''}" data-code="${k}" title="${esc(CODES[k].name)}">
+                ${esc(CODES[k].label === '[strikethrough]' ? '[—]' : CODES[k].label)} ${esc(CODES[k].name.split(' (')[0])}${k === 'VF' ? ' <i class="fas fa-lock"></i>' : ''}
+            </button>`).join('');
+        renderQueue();
+    }
+
+    ['task-title', 'task-level', 'task-class', 'task-prompt'].forEach(id => $(id).addEventListener('change', () => {
+        const s = state.settings;
+        s.taskTitle = $('task-title').value.trim(); s.taskLevel = $('task-level').value;
+        s.taskClass = $('task-class').value.trim(); s.taskPrompt = $('task-prompt').value.trim();
+        saveSettings(); renderQueue();
+    }));
+
+    $('focus-chips').addEventListener('click', e => {
+        const b = e.target.closest('.chip'); if (!b || b.dataset.code === 'VF') return;
+        const f = state.settings.focus, k = b.dataset.code;
+        if (f.includes(k)) f.splice(f.indexOf(k), 1);
+        else {
+            f.push(k);
+            if (f.length > 2) toast('Tip: the panel suggests VF + at most ONE extra focus.', 3000);
+        }
+        saveSettings(); renderMark();
+    });
+
+    const dz = $('dropzone');
+    dz.addEventListener('click', () => $('file-input').click());
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+    dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); addFilesToQueue([...e.dataTransfer.files]); });
+    $('file-input').addEventListener('change', e => { addFilesToQueue([...e.target.files]); e.target.value = ''; });
+
+    function guessStudent(filename) {
+        const cls = state.settings.taskClass;
+        const pool = state.students.filter(s => !cls || s.cls === cls);
+        const base = filename.replace(/\.[^.]+$/, '').toLowerCase();
+        const byName = pool.find(s => base.includes(s.name.toLowerCase()));
+        if (byName) return byName.id;
+        const m = base.match(/(?:^|[^0-9])(\d{1,2})(?:[^0-9]|$)/);
+        if (m) { const byNo = pool.find(s => String(s.no) === String(+m[1])); if (byNo) return byNo.id; }
+        return '';
+    }
+
+    async function addFilesToQueue(files) {
+        for (const f of files) {
+            const item = { id: uid(), filename: f.name, pages: [], studentId: guessStudent(f.name), status: 'Reading file…', statusCls: '' };
+            state.queue.push(item); renderQueue();
+            try { item.pages = await fileToPages(f); item.status = `${item.pages.length} page(s) ready`; }
+            catch (e) { item.status = friendlyError(e); item.statusCls = 'err'; }
+            renderQueue();
+        }
+    }
+
+    let pageTarget = null;
+    $('page-input').addEventListener('change', async e => {
+        const item = state.queue.find(q => q.id === pageTarget);
+        for (const f of e.target.files) {
+            try { item.pages.push(...await fileToPages(f)); item.status = `${item.pages.length} page(s) ready`; item.statusCls = ''; }
+            catch (err) { item.status = friendlyError(err); item.statusCls = 'err'; }
+        }
+        e.target.value = ''; renderQueue();
+    });
+
+    function studentOptions(selected, cls) {
+        const pool = state.students.filter(s => !cls || s.cls === cls);
+        const list = pool.length ? pool : state.students;
+        return `<option value="">— choose student —</option>` +
+            list.map(s => `<option value="${s.id}" ${s.id === selected ? 'selected' : ''}>${esc(s.cls)} ${esc(s.no)} ${esc(s.name)}</option>`).join('') +
+            `<option value="__new">+ New student…</option>`;
+    }
+
+    function renderQueue() {
+        const q = state.queue;
+        $('queue').innerHTML = q.map(item => `
+            <div class="queue-item" data-id="${item.id}">
+                <div class="thumbs">${item.pages.map((p, i) => `<img class="thumb" src="${p}" data-zoom="${item.id}:${i}" alt="page ${i + 1}">`).join('') || '<div class="thumb" style="display:flex;align-items:center;justify-content:center;"><span class="spinner"></span></div>'}</div>
+                <div class="queue-meta">
+                    <div style="font-size:0.8rem; color:var(--muted); margin-bottom:4px;">${esc(item.filename)}</div>
+                    <select data-act="student">${studentOptions(item.studentId, state.settings.taskClass)}</select>
+                    <div class="status-line ${item.statusCls}">${esc(item.status)}</div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <button class="btn btn-light btn-sm" data-act="page"><i class="fas fa-plus"></i> page</button>
+                    <button class="btn btn-danger btn-sm" data-act="remove"><i class="fas fa-xmark"></i></button>
+                </div>
+            </div>`).join('');
+        const ready = q.filter(i => i.pages.length && i.statusCls !== 'done').length;
+        $('queue-summary').textContent = q.length ? `${q.length} script(s), ${ready} waiting to be marked` : '';
+    }
+
+    $('queue').addEventListener('click', e => {
+        const row = e.target.closest('.queue-item'); if (!row) return;
+        const item = state.queue.find(q => q.id === row.dataset.id);
+        const z = e.target.closest('[data-zoom]');
+        if (z) { const [, i] = z.dataset.zoom.split(':'); return openLightbox(item.pages, +i); }
+        const act = e.target.closest('[data-act]')?.dataset.act;
+        if (act === 'remove') { state.queue = state.queue.filter(q => q !== item); renderQueue(); }
+        if (act === 'page') { pageTarget = item.id; $('page-input').click(); }
+    });
+    $('queue').addEventListener('change', async e => {
+        if (e.target.dataset.act !== 'student') return;
+        const item = state.queue.find(q => q.id === e.target.closest('.queue-item').dataset.id);
+        if (e.target.value === '__new') {
+            const s = await promptNewStudent();
+            item.studentId = s ? s.id : '';
+            renderQueue();
+        } else item.studentId = e.target.value;
+    });
+
+    async function promptNewStudent() {
+        const raw = prompt('New student: class, class no., name\n(e.g. 2A, 5, Chan Tai Man)', `${state.settings.taskClass || ''}, , `);
+        if (!raw) return null;
+        const added = upsertRoster(raw);
+        await saveStudents();
+        return added[0] || null;
+    }
+
+    $('clear-queue-btn').addEventListener('click', () => { state.queue = []; renderQueue(); });
+
+    $('mark-all-btn').addEventListener('click', async () => {
+        if (!state.settings.apiKey) { toast('Add your Claude API key in Settings first.'); return switchTab('settings'); }
+        const todo = state.queue.filter(i => i.pages.length && i.statusCls !== 'done');
+        if (!todo.length) return toast('Upload at least one script first.');
+        if (todo.some(i => !i.studentId) && !confirm('Some scripts have no student chosen. Mark them anyway as "Unassigned"?')) return;
+        const btn = $('mark-all-btn'); btn.disabled = true;
+        for (const item of todo) {
+            item.status = 'Marking… (reading handwriting and checking errors, about 1–2 minutes)'; item.statusCls = ''; renderQueue();
+            try {
+                const sub = await markScript(item);
+                item.status = `Done — ${sub.errors.filter(x => isFocus(x, sub)).length} focus error(s), ${sub.errors.length} in total. Open in Scripts tab.`;
+                item.statusCls = 'done'; item.subId = sub.id;
+            } catch (e) {
+                console.error(e); item.status = 'Failed: ' + friendlyError(e); item.statusCls = 'err';
+            }
+            renderQueue();
+        }
+        btn.disabled = false;
+        toast('Marking finished.');
+    });
+
+    const MARK_SCHEMA = {
+        type: 'object', additionalProperties: false,
+        required: ['transcript', 'errors', 'strengths', 'areas_to_improve', 'growth_feedback', 'content_comment'],
+        properties: {
+            transcript: { type: 'string', description: 'Exact transcription of the handwriting, errors kept. Paragraphs separated by a blank line.' },
+            errors: {
+                type: 'array', items: {
+                    type: 'object', additionalProperties: false,
+                    required: ['code', 'sub_code', 'also_code', 'original', 'correction', 'sentence', 'explanation', 'explanation_zh'],
+                    properties: {
+                        code: { type: 'string', enum: CODE_KEYS },
+                        sub_code: { type: 'string', enum: [...SUB_KEYS, ''] },
+                        also_code: { type: 'string', enum: [...CODE_KEYS, ''] },
+                        original: { type: 'string' },
+                        correction: { type: 'string' },
+                        sentence: { type: 'string' },
+                        explanation: { type: 'string' },
+                        explanation_zh: { type: 'string' }
+                    }
+                }
+            },
+            strengths: { type: 'array', items: { type: 'string' } },
+            areas_to_improve: {
+                type: 'array', items: {
+                    type: 'object', additionalProperties: false, required: ['area', 'evidence', 'how'],
+                    properties: { area: { type: 'string' }, evidence: { type: 'string' }, how: { type: 'string' } }
+                }
+            },
+            growth_feedback: { type: 'string' },
+            content_comment: { type: 'string' }
+        }
+    };
+
+    const MARK_SYSTEM = `You are an experienced Hong Kong secondary-school English teacher marking students' handwritten first drafts with the English panel's FOCUS MARKING scheme.
+
+Error codes (main category, then sub-codes for teachers' reference):
+${rubricText()}
+
+Article errors: wrong article → WW; missing article → MISS; redundant article → RED.
+When one verb shows both a form error and a tense error (e.g. "He were doing homework now": were/was = VF, was/is = VT), use code VF and also_code VT.
+
+How to work:
+1. Transcribe the handwriting EXACTLY as written, keeping every mistake, the student's spelling and paragraphing. Do not fix anything in the transcript. Write [?] for a word you truly cannot read. Ignore crossed-out words.
+2. List every language error you find in the order it appears, not only the focus areas — the teacher decides what to show. Each error needs:
+   - original: the shortest exact substring of your transcript that contains the error (copy it character-for-character so it can be found). For MISS, give the word right after the gap (or right before it at the end of a sentence). For ST / IU, give the whole problem phrase or clause.
+   - correction: what that same substring should become (for RED, the substring with the extra words removed, or empty).
+   - sentence: the full sentence from the transcript containing the error.
+   - explanation: one short, student-friendly sentence on the rule. explanation_zh: the same in Traditional Chinese (Hong Kong usage).
+   - sub_code: the matching sub-code if one applies, otherwise empty.
+3. Be accurate rather than exhaustive: do not flag acceptable British/American variants or stylistic choices as errors.
+4. strengths: 2–4 specific things the student does well (quote short examples).
+5. areas_to_improve: the 2–3 most useful next steps, each with evidence from the script and a concrete "how".
+6. growth_feedback: 3–5 warm sentences addressed to the student that promote a growth mindset (praise effort and strategies, name one clear next target, encourage). Plain English suitable for the student's level.
+7. content_comment: 1–3 sentences for the teacher on content, task fulfilment and organisation.`;
+
+    async function markScript(item) {
+        const s = state.settings;
+        const focusNames = s.focus.map(k => `${k} (${CODES[k].name})`).join(', ');
+        const content = [
+            ...libraryBlocks('useInMarking'),
+            { type: 'text', text:
+`Task: ${s.taskTitle || '(untitled)'}
+Level: ${s.taskLevel}
+Focus areas this round: ${focusNames}
+${s.taskPrompt ? 'Writing question:\n' + s.taskPrompt + '\n' : ''}${s.notes ? 'Extra marking notes from the teacher:\n' + s.notes + '\n' : ''}
+The student's handwritten draft (${item.pages.length} page(s)) follows.` },
+            ...item.pages.flatMap((p, i) => [
+                { type: 'text', text: `Page ${i + 1}` },
+                { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: p.split(',')[1] } }
+            ]),
+            { type: 'text', text: 'Transcribe and mark this draft following your instructions.' }
+        ];
+        const r = await callClaude({ system: MARK_SYSTEM, content, schema: MARK_SCHEMA });
+        const sub = {
+            id: uid(), studentId: item.studentId || '', created: new Date().toISOString(),
+            task: s.taskTitle || 'Untitled task', level: s.taskLevel,
+            cls: studentOf({ studentId: item.studentId })?.cls || s.taskClass || '',
+            focus: [...s.focus], pages: item.pages, filename: item.filename,
+            transcript: r.transcript, wordCount: wordCount(r.transcript),
+            errors: r.errors.map(e => ({ id: uid(), code: e.code, sub: e.sub_code, also: e.also_code, original: e.original, correction: e.correction,
+                                          sentence: e.sentence, explanation: e.explanation, explanationZh: e.explanation_zh, on: true })),
+            strengths: r.strengths, improve: r.areas_to_improve, growth: r.growth_feedback, content: r.content_comment,
+            reviewed: false, model: s.model
+        };
+        state.subs.push(sub);
+        await saveSub(sub);
+        return sub;
+    }
+
+    // ================================================================
+    // ERROR LOCATING + RENDERING THE MARKED SCRIPT
+    // ================================================================
+    const isFocus = (e, sub) => {
+        const focus = sub ? sub.focus : null;
+        if (!focus) return e.code === 'VF' || e.also === 'VF';
+        return focus.includes(e.code) || (e.also && focus.includes(e.also));
+    };
+
+    function locateErrors(sub) {
+        const t = sub.transcript;
+        const taken = [];
+        const overlaps = (a, b) => taken.some(r => a < r[1] && b > r[0]);
+        let cursor = 0;
+        const placed = [];
+        for (const e of sub.errors) {
+            if (!e.on || !e.original) { placed.push({ e, start: -1 }); continue; }
+            let i = t.indexOf(e.original, cursor);
+            while (i !== -1 && overlaps(i, i + e.original.length)) i = t.indexOf(e.original, i + 1);
+            if (i === -1) { i = t.indexOf(e.original); while (i !== -1 && overlaps(i, i + e.original.length)) i = t.indexOf(e.original, i + 1); }
+            if (i === -1) { placed.push({ e, start: -1 }); continue; }
+            taken.push([i, i + e.original.length]);
+            placed.push({ e, start: i, end: i + e.original.length });
+            cursor = i + e.original.length;
+        }
+        return placed;
+    }
+
+    // Number focus errors in reading order per code, e.g. VF1, VF2, VT1; combined → VF3+VT2
+    function numberErrors(sub) {
+        const placed = locateErrors(sub).filter(p => p.e.on);
+        placed.sort((a, b) => (a.start < 0) - (b.start < 0) || a.start - b.start);
+        const counters = {}, labels = {};
+        for (const p of placed) {
+            if (!isFocus(p.e, sub)) { labels[p.e.id] = codeTag(p.e.code) + (p.e.also ? '+' + codeTag(p.e.also) : ''); continue; }
+            const parts = [p.e.code, p.e.also].filter(c => c && sub.focus.includes(c)).map(c => {
+                counters[c] = (counters[c] || 0) + 1; return CODES[c].tag + counters[c];
+            });
+            labels[p.e.id] = parts.join('+');
+        }
+        return { placed, labels };
+    }
+    const codeTag = c => CODES[c]?.tag || c;
+
+    function renderScriptHtml(sub, view) {
+        const t = sub.transcript || '';
+        const { placed, labels } = numberErrors(sub);
+        const showOther = view === 'teacher' || (view === 'student' && state.settings.showOther);
+        const marks = placed.filter(p => p.start >= 0 && (isFocus(p.e, sub) || showOther)).sort((a, b) => a.start - b.start);
+        if (view === 'clean') return paragraphs(esc(t));
+        let html = '', pos = 0;
+        for (const p of marks) {
+            html += esc(t.slice(pos, p.start));
+            const focus = isFocus(p.e, sub);
+            const orig = esc(t.slice(p.start, p.end));
+            const label = esc(labels[p.e.id]);
+            const blank = view === 'teacher' ? `<span class="fix">${esc(p.e.correction) || '∅'}</span>` : '<span class="blank"></span>';
+            let inner;
+            if (p.e.code === 'RED') inner = `<span class="strike">${orig}</span>`;
+            else if (p.e.code === 'MISS') inner = `<span class="caret">^</span>${orig}`;
+            else if (p.e.code === 'ST' || p.e.code === 'IU') inner = `<span class="br">{</span>${orig}<span class="br">}</span>`;
+            else inner = `<span class="br">[</span>${orig}<span class="br">]</span>`;
+            const tag = focus ? `${label} ( ${blank} )` : (view === 'teacher' ? `${label}: ${esc(p.e.correction)}` : label);
+            html += `<span class="err ${focus ? 'focus' : 'other'}" data-eid="${p.e.id}"><span class="tag">${tag}</span>${inner}</span>`;
+            pos = p.end;
+        }
+        html += esc(t.slice(pos));
+        return paragraphs(html);
+    }
+    const paragraphs = html => html.split(/\n\s*\n/).map(p => `<p>${p.replace(/\n/g, ' ')}</p>`).join('');
+
+    // ================================================================
+    // SCRIPTS TAB
+    // ================================================================
+    function fillSelect(el, values, all = 'All') {
+        const cur = el.value;
+        el.innerHTML = `<option value="">${all}</option>` + values.map(v => `<option ${v === cur ? 'selected' : ''}>${esc(v)}</option>`).join('');
+    }
+    const uniq = a => [...new Set(a.filter(Boolean))].sort();
+
+    function renderScriptsList() {
+        $('script-detail').classList.add('hidden'); $('scripts-list-view').classList.remove('hidden');
+        fillSelect($('filter-task'), uniq(state.subs.map(s => s.task)));
+        fillSelect($('filter-class'), uniq(state.subs.map(s => s.cls)));
+        const ft = $('filter-task').value, fc = $('filter-class').value, fn = $('filter-name').value.trim().toLowerCase();
+        const rows = state.subs.filter(s => (!ft || s.task === ft) && (!fc || s.cls === fc) && (!fn || studentName(s.studentId).toLowerCase().includes(fn)))
+            .sort((a, b) => b.created.localeCompare(a.created));
+        $('scripts-table').innerHTML = rows.length ? `
+            <tr><th>Student</th><th>Task</th><th>Words</th><th>Focus errors</th><th>All errors</th><th>Status</th><th>Date</th></tr>
+            ${rows.map(s => {
+                const on = s.errors.filter(e => e.on);
+                return `<tr class="clickable" data-sid="${s.id}">
+                    <td><b>${esc(studentName(s.studentId))}</b></td><td>${esc(s.task)}</td><td class="num">${s.wordCount}</td>
+                    <td class="num"><span class="pill focus">${on.filter(e => isFocus(e, s)).length}</span></td>
+                    <td class="num">${on.length}</td>
+                    <td>${s.reviewed ? '<span class="pill ok">Checked</span>' : '<span class="pill warn">AI draft</span>'}</td>
+                    <td>${new Date(s.created).toLocaleDateString()}</td></tr>`;
+            }).join('')}` : `<tr><td class="empty">No marked scripts yet. Upload scans in the Mark tab.</td></tr>`;
+    }
+    ['filter-task', 'filter-class'].forEach(id => $(id).addEventListener('change', renderScriptsList));
+    $('filter-name').addEventListener('input', renderScriptsList);
+    $('scripts-table').addEventListener('click', e => { const r = e.target.closest('tr[data-sid]'); if (r) openScript(r.dataset.sid); });
+
+    function openScript(id) {
+        state.openSubId = id;
+        switchTab('scripts');
+        $('scripts-list-view').classList.add('hidden');
+        $('script-detail').classList.remove('hidden');
+        renderScriptDetail();
+    }
+
+    function renderScriptDetail() {
+        const sub = state.subs.find(s => s.id === state.openSubId); if (!sub) return renderScriptsList();
+        const { labels } = numberErrors(sub);
+        const studentSel = `<select id="sd-student">${studentOptions(sub.studentId, sub.cls)}</select>`;
+        const focusCodes = sub.focus.map(k => `<span class="pill focus">${esc(CODES[k].label)}</span>`).join(' ');
+        const placedIds = new Set(locateErrors(sub).filter(p => p.start >= 0).map(p => p.e.id));
+        const ordered = [...sub.errors].sort((a, b) => (isFocus(b, sub) - isFocus(a, sub)));
+
+        $('script-detail').innerHTML = `
+            <div class="actions" style="margin:0 0 12px;">
+                <button class="btn btn-light" id="sd-back"><i class="fas fa-arrow-left"></i> All scripts</button>
+                <button class="btn btn-primary" id="sd-print"><i class="fas fa-print"></i> Print student copy</button>
+                <button class="btn btn-light" id="sd-print-key"><i class="fas fa-print"></i> Print teacher key</button>
+                <button class="btn btn-light" id="sd-copy"><i class="fas fa-copy"></i> Copy e-draft (OCR text)</button>
+                <button class="btn ${sub.reviewed ? 'btn-light' : 'btn-gold'}" id="sd-review"><i class="fas fa-check"></i> ${sub.reviewed ? 'Checked ✓' : 'Mark as checked'}</button>
+                <button class="btn btn-danger" id="sd-delete"><i class="fas fa-trash"></i></button>
+            </div>
+            <div class="card">
+                <div class="row">
+                    <div><label class="f">Student</label>${studentSel}</div>
+                    <div><label class="f">Task</label><input type="text" id="sd-task" value="${esc(sub.task)}"></div>
+                    <div><label class="f">Focus</label><div style="padding-top:6px;">${focusCodes}</div></div>
+                </div>
+            </div>
+            <div class="grid2">
+                <div class="card plain scan-col">
+                    <h3>Scanned draft</h3>
+                    ${sub.pages.map((p, i) => `<img src="${p}" data-page="${i}" alt="page ${i + 1}">`).join('')}
+                </div>
+                <div class="card plain">
+                    <h3>Marked draft</h3>
+                    <div class="viewbar">
+                        <button class="chip ${state.view === 'student' ? 'on' : ''}" data-view="student">Student copy (blank brackets)</button>
+                        <button class="chip ${state.view === 'teacher' ? 'on' : ''}" data-view="teacher">Teacher key (all errors)</button>
+                        <button class="chip ${state.view === 'clean' ? 'on' : ''}" data-view="clean">Edit OCR text</button>
+                    </div>
+                    ${state.view === 'clean'
+                        ? `<textarea id="sd-transcript" rows="16" style="font-family:Georgia,serif; font-size:1rem;">${esc(sub.transcript)}</textarea>
+                           <div class="actions"><button class="btn btn-primary btn-sm" id="sd-save-transcript">Save text</button><span class="sub" style="margin:0;">Fix misread words here; errors whose text can't be found are listed below as "not placed".</span></div>`
+                        : `<div class="script" id="sd-script">${renderScriptHtml(sub, state.view)}</div>`}
+                    <div class="legend" style="margin-top:8px;"><span class="pill">${sub.wordCount} words</span> ${CODE_KEYS.map(k => `<b>${esc(CODES[k].tag)}</b> ${esc(CODES[k].name.split(' (')[0])}`).join(' · ')}</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Errors <span class="zh">— untick to drop an AI suggestion, change the code, or edit the correction. Focus errors are numbered for students.</span></h3>
+                <div class="table-wrap"><table class="err-table" id="sd-errors">
+                    <tr><th>Show</th><th>No.</th><th>Code</th><th>Sub-code</th><th>Student wrote</th><th>Correction</th><th>Why / 解釋</th><th></th></tr>
+                    ${ordered.map(e => `
+                    <tr data-eid="${e.id}" class="${e.on ? '' : 'off'}">
+                        <td><input type="checkbox" data-f="on" ${e.on ? 'checked' : ''}></td>
+                        <td><b style="color:${isFocus(e, sub) ? 'var(--focus)' : 'var(--muted)'}">${esc(e.on ? labels[e.id] || '' : '')}</b>${e.on && !placedIds.has(e.id) ? '<br><span class="pill warn">not placed</span>' : ''}</td>
+                        <td><select data-f="code">${CODE_KEYS.map(k => `<option value="${k}" ${k === e.code ? 'selected' : ''}>${esc(CODES[k].tag)}</option>`).join('')}</select></td>
+                        <td><select data-f="sub"><option value=""></option>${Object.entries(CODES[e.code].subs).map(([k, d]) => `<option value="${k}" ${k === e.sub ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select></td>
+                        <td><input type="text" data-f="original" value="${esc(e.original)}"></td>
+                        <td><input type="text" data-f="correction" value="${esc(e.correction)}"></td>
+                        <td style="min-width:200px; font-size:0.8rem;">${esc(e.explanation)}<br><span class="zh">${esc(e.explanationZh)}</span></td>
+                        <td><button class="btn btn-danger btn-sm" data-del="${e.id}"><i class="fas fa-xmark"></i></button></td>
+                    </tr>`).join('')}
+                </table></div>
+                <div class="actions"><button class="btn btn-light btn-sm" id="sd-add-err"><i class="fas fa-plus"></i> Add an error</button></div>
+            </div>
+
+            <div class="grid2">
+                <div class="card">
+                    <h3>Feedback to student (growth mindset)</h3>
+                    <textarea id="sd-growth" rows="6">${esc(sub.growth)}</textarea>
+                    <label class="f">Strengths</label>
+                    <textarea id="sd-strengths" rows="4">${esc((sub.strengths || []).join('\n'))}</textarea>
+                    <div class="actions"><button class="btn btn-primary btn-sm" id="sd-save-fb">Save feedback</button></div>
+                </div>
+                <div class="card">
+                    <h3>Areas to strengthen</h3>
+                    ${(sub.improve || []).map(a => `<p style="margin-bottom:10px;"><b>${esc(a.area)}</b><br><span class="zh">Evidence:</span> ${esc(a.evidence)}<br><span class="zh">How:</span> ${esc(a.how)}</p>`).join('') || '<p class="sub">—</p>'}
+                    <h3 style="margin-top:12px;">Content &amp; organisation (teacher note)</h3>
+                    <p style="font-size:0.9rem;">${esc(sub.content || '—')}</p>
+                </div>
+            </div>`;
+    }
+
+    $('script-detail').addEventListener('click', async e => {
+        const sub = state.subs.find(s => s.id === state.openSubId); if (!sub) return;
+        const id = e.target.closest('button')?.id;
+        const v = e.target.closest('[data-view]');
+        if (v) { state.view = v.dataset.view; return renderScriptDetail(); }
+        if (e.target.matches('img[data-page]')) return openLightbox(sub.pages, +e.target.dataset.page);
+        const del = e.target.closest('[data-del]');
+        if (del) { sub.errors = sub.errors.filter(x => x.id !== del.dataset.del); await saveSub(sub); return renderScriptDetail(); }
+        const mark = e.target.closest('.err[data-eid]');
+        if (mark) {
+            const row = document.querySelector(`#sd-errors tr[data-eid="${mark.dataset.eid}"]`);
+            if (row) { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.style.background = '#fef9c3'; setTimeout(() => row.style.background = '', 1500); }
+            return;
+        }
+        if (id === 'sd-back') return renderScriptsList();
+        if (id === 'sd-print') return printScript(sub, 'student');
+        if (id === 'sd-print-key') return printScript(sub, 'teacher');
+        if (id === 'sd-copy') { await navigator.clipboard.writeText(sub.transcript); return toast('E-draft text copied — students can paste it into Penso / StarLab.'); }
+        if (id === 'sd-review') { sub.reviewed = !sub.reviewed; await saveSub(sub); return renderScriptDetail(); }
+        if (id === 'sd-delete') {
+            if (!confirm('Delete this marked script?')) return;
+            state.subs = state.subs.filter(s => s !== sub); await DB.del('sub:' + sub.id); return renderScriptsList();
+        }
+        if (id === 'sd-save-transcript') {
+            sub.transcript = $('sd-transcript').value; sub.wordCount = wordCount(sub.transcript);
+            await saveSub(sub); toast('Text saved.'); state.view = 'teacher'; return renderScriptDetail();
+        }
+        if (id === 'sd-save-fb') {
+            sub.growth = $('sd-growth').value; sub.strengths = $('sd-strengths').value.split('\n').map(x => x.trim()).filter(Boolean);
+            await saveSub(sub); return toast('Feedback saved.');
+        }
+        if (id === 'sd-add-err') {
+            sub.errors.push({ id: uid(), code: sub.focus[0], sub: '', also: '', original: '', correction: '', sentence: '', explanation: 'Added by teacher.', explanationZh: '', on: true });
+            await saveSub(sub); return renderScriptDetail();
+        }
+    });
+
+    $('script-detail').addEventListener('change', async e => {
+        const sub = state.subs.find(s => s.id === state.openSubId); if (!sub) return;
+        if (e.target.id === 'sd-student') {
+            if (e.target.value === '__new') { const s = await promptNewStudent(); if (s) sub.studentId = s.id; }
+            else sub.studentId = e.target.value;
+            sub.cls = studentOf(sub)?.cls || sub.cls;
+            await saveSub(sub); return renderScriptDetail();
+        }
+        if (e.target.id === 'sd-task') { sub.task = e.target.value.trim() || sub.task; return saveSub(sub); }
+        const row = e.target.closest('tr[data-eid]'); if (!row) return;
+        const err = sub.errors.find(x => x.id === row.dataset.eid);
+        const f = e.target.dataset.f;
+        if (f === 'on') err.on = e.target.checked;
+        else if (f === 'code') { err.code = e.target.value; err.sub = ''; if (err.also === err.code) err.also = ''; }
+        else if (f === 'original') {
+            err.original = e.target.value;
+            if (err.original && !err.sentence) err.sentence = (sub.transcript.split(/(?<=[.!?])\s+/).find(x => x.includes(err.original)) || '').trim();
+        }
+        else err[f] = e.target.value;
+        await saveSub(sub); renderScriptDetail();
+    });
+
+    function printScript(sub, view) {
+        const st = studentOf(sub);
+        const focusLegend = sub.focus.map(k => `<b>${esc(CODES[k].label)}</b> ${esc(CODES[k].name)}`).join('; ');
+        $('print-area').innerHTML = `
+            <h2 style="margin-bottom:4px;">${esc(sub.task)} ${view === 'teacher' ? '— Teacher key' : ''}</h2>
+            <p style="margin-bottom:10px;">Name: <b>${esc(st?.name || '______________')}</b> &nbsp; Class: <b>${esc(st?.cls || sub.cls || '____')}</b> &nbsp; No.: <b>${esc(st?.no || '___')}</b></p>
+            <p style="font-size:0.85rem; margin-bottom:10px;">Focus: ${focusLegend}. ${view === 'student' ? 'Write your correction inside each bracket.' : ''}</p>
+            <div class="script">${renderScriptHtml(sub, view)}</div>
+            ${view === 'student' ? `<h3 style="margin-top:16px;">Teacher's feedback</h3><p style="line-height:1.6;">${esc(sub.growth)}</p>
+                ${(sub.strengths || []).length ? `<p style="margin-top:8px;"><b>What you did well:</b></p><ul style="padding-left:20px;">${sub.strengths.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
+                ${(sub.improve || []).length ? `<p style="margin-top:8px;"><b>Next steps:</b></p><ul style="padding-left:20px;">${sub.improve.map(a => `<li><b>${esc(a.area)}</b> — ${esc(a.how)}</li>`).join('')}</ul>` : ''}` : ''}`;
+        window.print();
+    }
+
+    // ================================================================
+    // STUDENTS / INDIVIDUAL DIFFERENCES
+    // ================================================================
+    function subsFor(cls, task) { return state.subs.filter(s => (!cls || s.cls === cls) && (!task || s.task === task) && s.studentId); }
+
+    // per-student error stats: counts and rate per 100 words per code
+    function statsFor(subs) {
+        const words = subs.reduce((n, s) => n + (s.wordCount || 0), 0) || 1;
+        const counts = Object.fromEntries(CODE_KEYS.map(k => [k, 0]));
+        const subCounts = {};
+        for (const s of subs) for (const e of s.errors) if (e.on) {
+            counts[e.code]++; if (e.also) counts[e.also]++;
+            if (e.sub) subCounts[e.sub] = (subCounts[e.sub] || 0) + 1;
+        }
+        const rate = Object.fromEntries(CODE_KEYS.map(k => [k, counts[k] * 100 / words]));
+        return { words, counts, rate, subCounts, n: subs.length };
+    }
+
+    function classAverages(subs) {
+        const byStudent = {};
+        subs.forEach(s => (byStudent[s.studentId] = byStudent[s.studentId] || []).push(s));
+        const list = Object.values(byStudent).map(statsFor);
+        const avg = Object.fromEntries(CODE_KEYS.map(k => [k, list.length ? list.reduce((n, x) => n + x.rate[k], 0) / list.length : 0]));
+        return { avg, byStudent };
+    }
+
+    function renderStudents() {
+        fillSelect($('ind-class'), uniq([...state.students.map(s => s.cls), ...state.subs.map(s => s.cls)]), 'All classes');
+        fillSelect($('ind-task'), uniq(state.subs.map(s => s.task)), 'All tasks');
+        const cls = $('ind-class').value, task = $('ind-task').value;
+        const subs = subsFor(cls, task);
+        const { avg, byStudent } = classAverages(subs);
+        const ids = Object.keys(byStudent).sort((a, b) => studentName(a).localeCompare(studentName(b), undefined, { numeric: true }));
+        if (!ids.length) {
+            $('heat-table').innerHTML = `<tr><td class="empty">No marked scripts with a student assigned yet.</td></tr>`;
+            $('student-profile').innerHTML = ''; return;
+        }
+        const max = Math.max(0.01, ...ids.flatMap(id => CODE_KEYS.map(k => statsFor(byStudent[id]).rate[k])));
+        $('heat-table').innerHTML = `
+            <tr><th>Student</th><th>Scripts</th>${CODE_KEYS.map(k => `<th title="${esc(CODES[k].name)}">${esc(CODES[k].tag)}</th>`).join('')}</tr>
+            ${ids.map(id => {
+                const st = statsFor(byStudent[id]);
+                return `<tr class="clickable" data-stu="${id}"><td><b>${esc(studentName(id))}</b></td><td class="num">${st.n}</td>
+                    ${CODE_KEYS.map(k => {
+                        const v = st.rate[k], a = Math.min(1, v / max);
+                        return `<td class="heat" style="background:rgba(124,58,237,${(a * 0.75).toFixed(2)}); color:${a > 0.5 ? '#fff' : 'var(--navy)'}">${v ? v.toFixed(1) : '·'}</td>`;
+                    }).join('')}</tr>`;
+            }).join('')}
+            <tr><td><i>Class average</i></td><td></td>${CODE_KEYS.map(k => `<td class="num"><i>${avg[k].toFixed(1)}</i></td>`).join('')}</tr>`;
+        if (state.profileStudent && byStudent[state.profileStudent]) renderProfile(state.profileStudent, byStudent[state.profileStudent], avg);
+        else $('student-profile').innerHTML = '';
+    }
+    ['ind-class', 'ind-task'].forEach(id => $(id).addEventListener('change', renderStudents));
+    $('heat-table').addEventListener('click', e => {
+        const r = e.target.closest('tr[data-stu]'); if (!r) return;
+        state.profileStudent = r.dataset.stu; renderStudents();
+        $('student-profile').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    function classify(st, avg, k) {
+        if (st.counts[k] >= 2 && st.rate[k] > avg[k] * 1.3 + 0.2) return 'weak';
+        if (avg[k] > 0.3 && st.rate[k] < avg[k] * 0.6) return 'strong';
+        return '';
+    }
+
+    function renderProfile(id, subs, avg) {
+        const st = statsFor(subs);
+        const max = Math.max(0.5, ...CODE_KEYS.map(k => Math.max(st.rate[k], avg[k])));
+        const weak = CODE_KEYS.filter(k => classify(st, avg, k) === 'weak').sort((a, b) => st.rate[b] - st.rate[a]);
+        const strong = CODE_KEYS.filter(k => classify(st, avg, k) === 'strong');
+        const timeline = [...subs].sort((a, b) => a.created.localeCompare(b.created));
+        const focusSet = uniq(timeline.flatMap(s => s.focus));
+        const plan = state.students.find(s => s.id === id)?.plan;
+        const topSubs = Object.entries(st.subCounts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+        $('student-profile').innerHTML = `
+            <div class="card">
+                <h2>${esc(studentName(id))}</h2>
+                <p class="sub">${st.n} script(s) · ${st.words} words in total</p>
+                <div class="grid2">
+                    <div>
+                        <h3>Error rate vs class <span class="zh">(per 100 words)</span></h3>
+                        ${CODE_KEYS.map(k => `
+                            <div class="bar-row ${classify(st, avg, k)}">
+                                <div><b>${esc(CODES[k].tag)}</b> ${esc(CODES[k].name.split(' (')[0].split(' / ')[0])}</div>
+                                <div class="bar-track"><div class="bar-fill" style="width:${st.rate[k] / max * 100}%"></div><div class="bar-avg" style="left:${avg[k] / max * 100}%"></div></div>
+                                <div>${st.rate[k].toFixed(1)} <span class="zh">(${st.counts[k]})</span></div>
+                            </div>`).join('')}
+                    </div>
+                    <div>
+                        <h3>Needs strengthening 需加強</h3>
+                        ${weak.length ? weak.map(k => `<p style="margin-bottom:8px;"><span class="pill" style="background:#fee2e2;color:#b91c1c;">${esc(CODES[k].label)}</span> ${esc(CODES[k].name)} — ${st.rate[k].toFixed(1)} vs class ${avg[k].toFixed(1)}<br><span style="font-size:0.85rem;">${esc(CODES[k].rule)}</span></p>`).join('') : '<p class="sub">No error type clearly above the class average.</p>'}
+                        ${topSubs.length ? `<p style="font-size:0.85rem;"><b>Most frequent sub-types:</b> ${topSubs.map(([s, n]) => `${esc(s)} ×${n}`).join(', ')}</p>` : ''}
+                        <h3 style="margin-top:12px;">Relative strengths 強項</h3>
+                        ${strong.length ? strong.map(k => `<span class="pill ok">${esc(CODES[k].tag)} ${esc(CODES[k].name.split(' (')[0])}</span> `).join('') : '<p class="sub">Keep collecting scripts to see strengths.</p>'}
+                        ${timeline.length > 1 ? `
+                        <h3 style="margin-top:14px;">Focus errors over time</h3>
+                        <div class="table-wrap"><table><tr><th>Task</th>${focusSet.map(k => `<th>${esc(CODES[k].tag)} /100w</th>`).join('')}</tr>
+                            ${timeline.map(s => { const x = statsFor([s]); return `<tr><td>${esc(s.task)}</td>${focusSet.map(k => `<td class="num">${x.rate[k].toFixed(1)}</td>`).join('')}</tr>`; }).join('')}
+                        </table></div>` : ''}
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-gold" id="pf-plan"><i class="fas fa-wand-magic-sparkles"></i> AI improvement plan</button>
+                    <button class="btn btn-primary" id="pf-practice"><i class="fas fa-list-check"></i> Personal practice from own errors</button>
+                    ${timeline.map(s => `<button class="btn btn-light btn-sm" data-open="${s.id}">${esc(s.task)}</button>`).join('')}
+                </div>
+                <div id="pf-plan-out" style="margin-top:12px;">${plan ? renderPlan(plan) : ''}</div>
+            </div>`;
+        $('pf-plan').onclick = () => makePlan(id, subs, st, avg);
+        $('pf-practice').onclick = () => {
+            const errs = subs.flatMap(s => s.errors.filter(e => e.on && e.sentence).map(e => ({ ...e, subId: s.id })));
+            const pick = weak.length ? errs.filter(e => weak.includes(e.code)) : errs.filter(e => isFocus(e, subs[0]));
+            showWorksheet(buildOfflineWorksheet(pick.length ? pick : errs, `Personal practice — ${studentName(id)}`, 'correct'), false);
+        };
+        $('student-profile').querySelectorAll('[data-open]').forEach(b => b.onclick = () => openScript(b.dataset.open));
+    }
+
+    const PLAN_SCHEMA = {
+        type: 'object', additionalProperties: false,
+        required: ['summary', 'strengths', 'priorities', 'next_target', 'message_to_student'],
+        properties: {
+            summary: { type: 'string' },
+            strengths: { type: 'array', items: { type: 'string' } },
+            priorities: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['area', 'evidence', 'strategy', 'mini_task'],
+                properties: { area: { type: 'string' }, evidence: { type: 'string' }, strategy: { type: 'string' }, mini_task: { type: 'string' } } } },
+            next_target: { type: 'string' },
+            message_to_student: { type: 'string' }
+        }
+    };
+
+    async function makePlan(id, subs, st, avg) {
+        const out = $('pf-plan-out');
+        out.innerHTML = '<p class="sub"><span class="spinner"></span> Writing a personalised plan…</p>';
+        const errs = subs.flatMap(s => s.errors.filter(e => e.on).map(e => `[${e.code}${e.sub ? '/' + e.sub : ''}] "${e.sentence || e.original}" → ${e.correction}`)).slice(0, 120);
+        const table = CODE_KEYS.map(k => `${k}: student ${st.rate[k].toFixed(2)} vs class ${avg[k].toFixed(2)} per 100 words (${st.counts[k]} errors)`).join('\n');
+        try {
+            const r = await callClaude({
+                system: `You are a Hong Kong secondary English teacher writing a short, practical individual improvement plan based on focus-marking data. Error codes:\n${rubricText()}\nBe specific, kind and growth-minded. Priorities: at most 3, ordered by impact; each with evidence quoted from the student's sentences, a learning strategy, and a 5–10 minute mini task. message_to_student: 3–4 encouraging sentences in simple English.`,
+                content: [{ type: 'text', text:
+`Student level: ${subs[0]?.level || ''}
+Scripts: ${subs.map(s => s.task).join('; ')}
+Error rates compared with class average:
+${table}
+
+Strengths noted by the marker: ${subs.flatMap(s => s.strengths || []).join(' | ')}
+
+The student's errors:
+${errs.join('\n')}` }],
+                schema: PLAN_SCHEMA, maxTokens: 16000
+            });
+            const stu = state.students.find(s => s.id === id);
+            if (stu) { stu.plan = r; await saveStudents(); }
+            out.innerHTML = renderPlan(r);
+        } catch (e) { out.innerHTML = `<p class="status-line err">${esc(friendlyError(e))}</p>`; }
+    }
+
+    function renderPlan(p) {
+        return `<div style="background:#f8fafc; border-radius:10px; padding:14px;">
+            <h3>Improvement plan</h3>
+            <p style="margin-bottom:8px;">${esc(p.summary)}</p>
+            ${p.priorities.map((x, i) => `<p style="margin-bottom:8px;"><b>${i + 1}. ${esc(x.area)}</b><br><span class="zh">Evidence:</span> ${esc(x.evidence)}<br><span class="zh">Strategy:</span> ${esc(x.strategy)}<br><span class="zh">Mini task:</span> ${esc(x.mini_task)}</p>`).join('')}
+            <p><b>Next target:</b> ${esc(p.next_target)}</p>
+            <p style="margin-top:8px; font-style:italic;">“${esc(p.message_to_student)}”</p>
+        </div>`;
+    }
+
+    // ================================================================
+    // COMMON MISTAKES
+    // ================================================================
+    function commonPool() {
+        const cls = $('cm-class').value, task = $('cm-task').value, scope = $('cm-scope').value;
+        const subs = state.subs.filter(s => (!cls || s.cls === cls) && (!task || s.task === task));
+        const errs = subs.flatMap(s => s.errors.filter(e => e.on && e.sentence && (scope === 'all' || isFocus(e, s))).map(e => ({ ...e, subId: s.id })));
+        const freq = {};
+        errs.forEach(e => { freq[e.code] = (freq[e.code] || 0) + 1; });
+        const students = {};
+        errs.forEach(e => { const sid = state.subs.find(s => s.id === e.subId)?.studentId; (students[e.code] = students[e.code] || new Set()).add(sid); });
+        errs.sort((a, b) => (freq[b.code] - freq[a.code]) || a.code.localeCompare(b.code));
+        return { errs, freq, students, nSubs: subs.length };
+    }
+
+    function renderCommon() {
+        fillSelect($('cm-class'), uniq(state.subs.map(s => s.cls)), 'All classes');
+        fillSelect($('cm-task'), uniq(state.subs.map(s => s.task)), 'All tasks');
+        const { errs, freq, students, nSubs } = commonPool();
+        const keys = Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
+        const max = Math.max(1, ...Object.values(freq));
+        $('cm-chart').innerHTML = keys.length ? keys.map(k => `
+            <div class="bar-row"><div><b>${esc(CODES[k].tag)}</b> ${esc(CODES[k].name.split(' (')[0].split(' / ')[0])}</div>
+                <div class="bar-track"><div class="bar-fill" style="width:${freq[k] / max * 100}%"></div></div>
+                <div>${freq[k]} <span class="zh">${students[k].size}/${nSubs} scripts</span></div></div>`).join('')
+            : '<p class="empty">No errors yet for this selection.</p>';
+        const valid = new Set(errs.map(e => e.id));
+        state.cmSelected = new Set([...state.cmSelected].filter(id => valid.has(id)));
+        $('cm-table').innerHTML = errs.length ? `<tr><th></th><th>Code</th><th>Sentence (student wrote)</th><th>Correction</th></tr>` + errs.map(e => `
+            <tr><td><input type="checkbox" data-cm="${e.id}" ${state.cmSelected.has(e.id) ? 'checked' : ''}></td>
+                <td><span class="pill focus">${esc(CODES[e.code].tag)}</span>${e.sub && e.sub !== e.code ? `<br><span class="zh">${esc(e.sub)}</span>` : ''}</td>
+                <td>${highlight(e.sentence, e.original)}</td><td>${esc(e.correction)}</td></tr>`).join('') : '';
+        $('cm-count').textContent = `${state.cmSelected.size} selected`;
+        renderExList();
+    }
+    ['cm-class', 'cm-task', 'cm-scope'].forEach(id => $(id).addEventListener('change', renderCommon));
+    $('cm-table').addEventListener('change', e => {
+        const id = e.target.dataset.cm; if (!id) return;
+        e.target.checked ? state.cmSelected.add(id) : state.cmSelected.delete(id);
+        $('cm-count').textContent = `${state.cmSelected.size} selected`;
+    });
+    $('cm-none').addEventListener('click', () => { state.cmSelected.clear(); renderCommon(); });
+    $('cm-auto').addEventListener('click', () => {
+        const { errs, freq } = commonPool();
+        const top = Object.keys(freq).sort((a, b) => freq[b] - freq[a]).slice(0, 4);
+        state.cmSelected.clear();
+        const seen = new Set();
+        for (const k of top) {
+            let n = 0;
+            for (const e of errs) {
+                if (n >= 3) break;
+                if (e.code !== k || seen.has(e.sentence)) continue;
+                seen.add(e.sentence); state.cmSelected.add(e.id); n++;
+            }
+        }
+        renderCommon();
+    });
+
+    function highlight(sentence, original) {
+        const i = original ? sentence.indexOf(original) : -1;
+        if (i < 0) return esc(sentence);
+        return esc(sentence.slice(0, i)) + `<u><b>${esc(original)}</b></u>` + esc(sentence.slice(i + original.length));
+    }
+    const fixedSentence = e => { const i = e.original ? e.sentence.indexOf(e.original) : -1; return i < 0 ? e.correction : (e.sentence.slice(0, i) + e.correction + e.sentence.slice(i + e.original.length)).replace(/\s{2,}/g, ' '); };
+
+    function selectedErrors() { return commonPool().errs.filter(e => state.cmSelected.has(e.id)); }
+
+    // Offline worksheet built only from real errors
+    function buildOfflineWorksheet(errs, title, type) {
+        const byCode = {};
+        errs.forEach(e => (byCode[e.code] = byCode[e.code] || []).push(e));
+        const sections = Object.keys(byCode).map(k => ({
+            code: k, focus_label: `${CODES[k].label} ${CODES[k].name}`, rule: CODES[k].rule, class_examples: [],
+            practice: byCode[k].map(e => {
+                if (type === 'gap' && e.original && e.sentence.includes(e.original))
+                    return { question: e.sentence.replace(e.original, '__________') + ` (${e.original.trim()})`, answer: e.correction };
+                return { question: e.sentence, answer: fixedSentence(e) };
+            })
+        }));
+        return {
+            title, instructions: type === 'gap'
+                ? 'Fill in each blank with the correct form of the word(s) in brackets.'
+                : 'Each sentence below has ONE mistake of the type shown. Find it and rewrite the sentence correctly.',
+            sections, extension_task: ''
+        };
+    }
+
+    $('cm-build').addEventListener('click', () => {
+        const errs = selectedErrors();
+        if (!errs.length) return toast('Tick some sentences first (or use Auto-pick).');
+        const title = `Common mistakes — ${$('cm-task').value || 'Writing'}${$('cm-class').value ? ' (' + $('cm-class').value + ')' : ''}`;
+        showWorksheet(buildOfflineWorksheet(errs, title, $('cm-type').value === 'gap' ? 'gap' : 'correct'), true);
+    });
+
+    const EX_SCHEMA = {
+        type: 'object', additionalProperties: false,
+        required: ['title', 'instructions', 'sections', 'extension_task'],
+        properties: {
+            title: { type: 'string' }, instructions: { type: 'string' },
+            sections: { type: 'array', items: { type: 'object', additionalProperties: false,
+                required: ['code', 'focus_label', 'rule', 'class_examples', 'practice'],
+                properties: {
+                    code: { type: 'string', enum: CODE_KEYS }, focus_label: { type: 'string' }, rule: { type: 'string' },
+                    class_examples: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['wrong', 'right'], properties: { wrong: { type: 'string' }, right: { type: 'string' } } } },
+                    practice: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['question', 'answer'], properties: { question: { type: 'string' }, answer: { type: 'string' } } } }
+                } } },
+            extension_task: { type: 'string' }
+        }
+    };
+
+    $('cm-ai').addEventListener('click', async () => {
+        const errs = selectedErrors();
+        if (!errs.length) return toast('Tick some sentences first (or use Auto-pick).');
+        const btn = $('cm-ai'); btn.disabled = true; const old = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner"></span> Generating…';
+        const level = state.subs.find(s => s.id === errs[0].subId)?.level || '';
+        const type = { correct: 'error correction (each item contains exactly one error of the target type)', gap: 'gap fill (give the base word in brackets)', mixed: 'a mix of error correction, gap fill and sentence rewriting' }[$('cm-type').value];
+        try {
+            const r = await callClaude({
+                system: `You design short, focused grammar worksheets for Hong Kong secondary students from their own common writing mistakes. Error codes:\n${rubricText()}\nFor each error type: a clear rule in simple English (one or two sentences, add a Chinese hint in brackets if helpful), class_examples taken from the given sentences (anonymised, lightly trimmed), and NEW practice items in a similar context to the writing task. Never include student names. Answers must be complete and correct. If an exercise template is provided, follow its layout and style.`,
+                content: [...libraryBlocks('useInExercise'), { type: 'text', text:
+`Level: ${level}
+Writing task: ${$('cm-task').value || 'various'}
+Exercise type: ${type}
+New practice items per error type: ${$('cm-n').value}
+
+Class errors (code | wrong sentence | corrected):
+${errs.map(e => `${e.code}${e.sub ? '/' + e.sub : ''} | ${e.sentence} | ${fixedSentence(e)}`).join('\n')}
+
+extension_task: one short writing task (2–4 sentences) that makes students use the target forms correctly.` }],
+                schema: EX_SCHEMA, maxTokens: 24000
+            });
+            showWorksheet(r, true);
+        } catch (e) { toast(friendlyError(e), 5000); }
+        btn.disabled = false; btn.innerHTML = old;
+    });
+
+    function worksheetHtml(ws, withKey) {
+        let n = 0;
+        const body = ws.sections.map(s => `
+            <h2>${esc(s.focus_label || CODES[s.code]?.label)}</h2>
+            <div class="rule"><b>Remember:</b> ${esc(s.rule)}</div>
+            ${s.class_examples?.length ? `<p style="font-size:0.9rem;"><b>From our class:</b></p><ul style="padding-left:20px; font-size:0.9rem; margin-bottom:8px;">${s.class_examples.map(x => `<li>✗ ${esc(x.wrong)}<br>✓ ${esc(x.right)}</li>`).join('')}</ul>` : ''}
+            <ol start="${n + 1}">${s.practice.map(p => { n++; return `<li>${esc(p.question)}<span class="ans-line"></span></li>`; }).join('')}</ol>`).join('');
+        const key = `<div class="page-break"></div><h2>Answer key</h2><ol class="key">${ws.sections.flatMap(s => s.practice.map(p => `<li>${esc(p.answer)}</li>`)).join('')}</ol>`;
+        return `<div class="ws">
+            <h1>${esc(ws.title)}</h1>
+            <p style="margin-bottom:6px;">Name: ______________ &nbsp; Class: _____ &nbsp; No.: ___</p>
+            <p><i>${esc(ws.instructions)}</i></p>
+            ${body}
+            ${ws.extension_task ? `<h2>Extension</h2><p>${esc(ws.extension_task)}</p><span class="ans-line"></span><span class="ans-line"></span><span class="ans-line"></span>` : ''}
+            ${withKey ? key : ''}
+        </div>`;
+    }
+
+    function showWorksheet(ws, canSave) {
+        openModal(`
+            <div class="actions no-print" style="margin:0 0 12px;">
+                <button class="btn btn-primary" id="ws-print"><i class="fas fa-print"></i> Print (with answer key)</button>
+                <button class="btn btn-light" id="ws-print-nokey"><i class="fas fa-print"></i> Print without key</button>
+                <button class="btn btn-light" id="ws-copy"><i class="fas fa-copy"></i> Copy text</button>
+                ${canSave ? '<button class="btn btn-gold" id="ws-save"><i class="fas fa-floppy-disk"></i> Save</button>' : ''}
+            </div>
+            <div id="ws-view">${worksheetHtml(ws, true)}</div>`);
+        $('ws-print').onclick = () => { $('print-area').innerHTML = worksheetHtml(ws, true); window.print(); };
+        $('ws-print-nokey').onclick = () => { $('print-area').innerHTML = worksheetHtml(ws, false); window.print(); };
+        $('ws-copy').onclick = async () => { await navigator.clipboard.writeText($('ws-view').innerText); toast('Copied — paste into Word or Google Docs.'); };
+        if (canSave) $('ws-save').onclick = async () => {
+            const ex = { id: uid(), created: new Date().toISOString(), ws };
+            state.ex.push(ex); await DB.set('ex:' + ex.id, ex); toast('Exercise saved.'); renderExList();
+        };
+    }
+
+    function renderExList() {
+        const list = [...state.ex].sort((a, b) => b.created.localeCompare(a.created));
+        $('ex-list').innerHTML = list.length ? `<table>${list.map(x => `
+            <tr><td><b>${esc(x.ws.title)}</b><br><span class="zh">${new Date(x.created).toLocaleString()} · ${x.ws.sections.reduce((n, s) => n + s.practice.length, 0)} items</span></td>
+            <td style="text-align:right; white-space:nowrap;"><button class="btn btn-light btn-sm" data-exopen="${x.id}">Open</button>
+            <button class="btn btn-danger btn-sm" data-exdel="${x.id}"><i class="fas fa-xmark"></i></button></td></tr>`).join('')}</table>`
+            : '<p class="sub">No saved exercises yet.</p>';
+    }
+    $('ex-list').addEventListener('click', async e => {
+        const o = e.target.closest('[data-exopen]'), d = e.target.closest('[data-exdel]');
+        if (o) showWorksheet(state.ex.find(x => x.id === o.dataset.exopen).ws, false);
+        if (d && confirm('Delete this exercise?')) { state.ex = state.ex.filter(x => x.id !== d.dataset.exdel); await DB.del('ex:' + d.dataset.exdel); renderExList(); }
+    });
+
+    // ================================================================
+    // LIBRARY
+    // ================================================================
+    function renderLibrary() {
+        $('code-table').innerHTML = `<tr><th>#</th><th>Code</th><th>Main category</th><th>Sub-category</th></tr>` +
+            CODE_KEYS.map((k, i) => `<tr><td>${i + 1}</td><td><b style="color:var(--focus)">${CODES[k].label === '[strikethrough]' ? '[<span class="strike">strikethrough</span>]' : esc(CODES[k].label)}</b></td>
+                <td>${esc(CODES[k].name)} <span class="zh">${esc(CODES[k].zh)}</span></td>
+                <td>${Object.entries(CODES[k].subs).map(([s, d]) => esc(d) + (s !== k ? ` <b>[${esc(s)}]</b>` : '')).join('<br>')}</td></tr>`).join('') +
+            `<tr><td colspan="4" style="font-size:0.82rem;"><b>Remarks:</b> article errors — wrong article → [WW]; missing article → [^]; redundant article → [strikethrough]. A verb may show [VF] and [VT] at once, e.g. <i>He <b>[were doing]</b> homework now</i> → VF1+VT1 (were/was = VF; was/is = VT). Items 1–3 are the make-or-break errors.</td></tr>`;
+        $('rubric-notes').value = state.settings.notes || '';
+        const icon = l => l.mime === 'application/pdf' ? 'fa-file-pdf' : l.mime?.startsWith('image/') ? 'fa-file-image' : 'fa-file-lines';
+        $('lib-table').innerHTML = state.lib.length ? `<tr><th>Item</th><th>Type</th><th>Use in marking</th><th>Use in exercises</th><th></th></tr>` +
+            state.lib.map(l => `<tr data-lid="${l.id}">
+                <td><i class="fas ${icon(l)}" style="color:var(--gold)"></i> <b>${esc(l.title)}</b>${l.level ? ` <span class="pill">${esc(l.level)}</span>` : ''}<br><span class="zh">${esc(l.note || '')}</span></td>
+                <td>${esc(l.kind)}</td>
+                <td class="num"><input type="checkbox" data-lf="useInMarking" ${l.useInMarking ? 'checked' : ''}></td>
+                <td class="num"><input type="checkbox" data-lf="useInExercise" ${l.useInExercise ? 'checked' : ''}></td>
+                <td style="white-space:nowrap;"><button class="btn btn-light btn-sm" data-lview>View</button> <button class="btn btn-danger btn-sm" data-ldel><i class="fas fa-xmark"></i></button></td>
+            </tr>`).join('') : `<tr><td class="empty">Nothing uploaded yet.</td></tr>`;
+    }
+
+    $('save-notes').addEventListener('click', async () => { state.settings.notes = $('rubric-notes').value.trim(); await saveSettings(); toast('Notes saved — used in every marking.'); });
+
+    function libMeta() {
+        const kind = $('lib-kind').value;
+        return { kind, level: $('lib-level').value.trim(), note: $('lib-note').value.trim(),
+                 useInMarking: kind === 'rubric' || kind === 'example', useInExercise: kind === 'template' };
+    }
+    async function addLib(item) {
+        state.lib.push(item); await DB.set('lib:' + item.id, item);
+        $('lib-title').value = ''; $('lib-note').value = ''; $('lib-text').value = '';
+        renderLibrary();
+    }
+    $('lib-file-btn').addEventListener('click', () => $('lib-file').click());
+    $('lib-file').addEventListener('change', async e => {
+        for (const f of e.target.files) {
+            const base = { id: uid(), created: new Date().toISOString(), ...libMeta(), title: $('lib-title').value.trim() || f.name };
+            try {
+                if (f.type === 'application/pdf') {
+                    if (f.size > 20 * 1024 * 1024) { toast(`${f.name} is larger than 20 MB — please compress it.`); continue; }
+                    await addLib({ ...base, mime: 'application/pdf', data: await fileToBase64(f) });
+                } else if (f.type.startsWith('image/')) {
+                    await addLib({ ...base, mime: 'image/jpeg', data: await imageFileToJpeg(f, 2000) });
+                } else {
+                    await addLib({ ...base, mime: 'text/plain', text: await f.text() });
+                }
+            } catch (err) { toast(friendlyError(err), 4000); }
+        }
+        e.target.value = ''; toast('Uploaded.');
+    });
+    $('lib-add-text').addEventListener('click', async () => {
+        const text = $('lib-text').value.trim(); if (!text) return toast('Paste some text first.');
+        await addLib({ id: uid(), created: new Date().toISOString(), ...libMeta(), title: $('lib-title').value.trim() || 'Pasted ' + $('lib-kind').value, mime: 'text/plain', text });
+        toast('Saved.');
+    });
+    $('lib-table').addEventListener('change', async e => {
+        const row = e.target.closest('tr[data-lid]'); const l = state.lib.find(x => x.id === row?.dataset.lid); if (!l) return;
+        l[e.target.dataset.lf] = e.target.checked; await DB.set('lib:' + l.id, l);
+    });
+    $('lib-table').addEventListener('click', async e => {
+        const row = e.target.closest('tr[data-lid]'); const l = state.lib.find(x => x.id === row?.dataset.lid); if (!l) return;
+        if (e.target.closest('[data-ldel]')) {
+            if (!confirm(`Delete "${l.title}"?`)) return;
+            state.lib = state.lib.filter(x => x !== l); await DB.del('lib:' + l.id); renderLibrary();
+        }
+        if (e.target.closest('[data-lview]')) {
+            if (l.mime === 'application/pdf') {
+                const bytes = Uint8Array.from(atob(l.data), c => c.charCodeAt(0));
+                window.open(URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })), '_blank');
+            } else if (l.mime.startsWith('image/')) openLightbox([l.data], 0);
+            else openModal(`<h3>${esc(l.title)}</h3><pre style="white-space:pre-wrap; font-family:inherit; line-height:1.5;">${esc(l.text)}</pre>`);
+        }
+    });
+
+    // ================================================================
+    // SETTINGS / ROSTER / BACKUP
+    // ================================================================
+    function renderSettings() {
+        const s = state.settings;
+        $('set-key').value = s.apiKey; $('set-model').value = s.model; $('set-effort').value = s.effort; $('set-show-other').checked = !!s.showOther;
+        const list = [...state.students].sort((a, b) => (a.cls + String(a.no).padStart(3, '0')).localeCompare(b.cls + String(b.no).padStart(3, '0')));
+        $('roster-table').innerHTML = list.length ? `<tr><th>Class</th><th>No.</th><th>Name</th><th>Scripts</th><th></th></tr>` + list.map(st => `
+            <tr><td>${esc(st.cls)}</td><td>${esc(st.no)}</td><td>${esc(st.name)}</td><td class="num">${state.subs.filter(x => x.studentId === st.id).length}</td>
+            <td><button class="btn btn-danger btn-sm" data-sdel="${st.id}"><i class="fas fa-xmark"></i></button></td></tr>`).join('')
+            : `<tr><td class="empty">No students yet.</td></tr>`;
+    }
+    $('save-settings').addEventListener('click', async () => {
+        const s = state.settings;
+        s.apiKey = $('set-key').value.trim(); s.model = $('set-model').value; s.effort = $('set-effort').value; s.showOther = $('set-show-other').checked;
+        await saveSettings(); toast('Settings saved.');
+    });
+
+    function upsertRoster(text) {
+        const added = [];
+        for (const line of text.split('\n')) {
+            const parts = line.split(/[,\t]/).map(x => x.trim());
+            if (parts.length < 3 || !parts[2]) continue;
+            const [cls, no, ...rest] = parts; const name = rest.join(' ');
+            let st = state.students.find(s => s.cls === cls && String(s.no) === String(no));
+            if (st) st.name = name; else { st = { id: uid(), cls, no, name }; state.students.push(st); }
+            added.push(st);
+        }
+        return added;
+    }
+    $('roster-add').addEventListener('click', async () => {
+        const added = upsertRoster($('roster-input').value);
+        if (!added.length) return toast('Use one line per student: class, class no., name');
+        await saveStudents(); $('roster-input').value = ''; renderSettings(); toast(`${added.length} student(s) saved.`);
+    });
+    $('roster-table').addEventListener('click', async e => {
+        const d = e.target.closest('[data-sdel]'); if (!d) return;
+        if (!confirm('Remove this student? Their marked scripts are kept as "Unassigned".')) return;
+        state.students = state.students.filter(s => s.id !== d.dataset.sdel); await saveStudents(); renderSettings();
+    });
+
+    $('export-btn').addEventListener('click', () => {
+        const data = { app: 'writing-focus-marking', version: 1, exported: new Date().toISOString(),
+            settings: { ...state.settings, apiKey: '' }, students: state.students, subs: state.subs, lib: state.lib, ex: state.ex };
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
+        a.download = `writing-marking-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    });
+    $('import-btn').addEventListener('click', () => $('import-file').click());
+    $('import-file').addEventListener('change', async e => {
+        const f = e.target.files[0]; if (!f) return;
+        try {
+            const d = JSON.parse(await f.text());
+            if (d.app !== 'writing-focus-marking') throw new Error('This is not a backup file from this app.');
+            if (!confirm('Merge this backup into the data on this computer?')) return;
+            const merge = (cur, inc) => { const m = new Map(cur.map(x => [x.id, x])); inc.forEach(x => m.set(x.id, x)); return [...m.values()]; };
+            state.students = merge(state.students, d.students || []);
+            state.subs = merge(state.subs, d.subs || []);
+            state.lib = merge(state.lib, d.lib || []);
+            state.ex = merge(state.ex, d.ex || []);
+            state.settings = { ...d.settings, ...state.settings, apiKey: state.settings.apiKey };
+            await saveStudents(); await saveSettings();
+            for (const s of state.subs) await saveSub(s);
+            for (const l of state.lib) await DB.set('lib:' + l.id, l);
+            for (const x of state.ex) await DB.set('ex:' + x.id, x);
+            toast('Backup imported.'); renderSettings();
+        } catch (err) { toast(friendlyError(err), 4000); }
+        e.target.value = '';
+    });
+
+    // ================================================================
+    // MODAL / LIGHTBOX
+    // ================================================================
+    function openModal(html) {
+        $('modal-root').innerHTML = `<div class="modal-bg" id="modal-bg"><div class="modal"><button class="modal-close" id="modal-x">&times;</button>${html}</div></div>`;
+        $('modal-bg').addEventListener('click', e => { if (e.target.id === 'modal-bg' || e.target.closest('#modal-x')) $('modal-root').innerHTML = ''; });
+    }
+    function openLightbox(pages, i) {
+        openModal(`<div class="lightbox">${pages.map((p, j) => `<img src="${p}" id="lb-${j}" style="margin-bottom:10px;">`).join('')}</div>`);
+        setTimeout(() => document.getElementById('lb-' + i)?.scrollIntoView(), 50);
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') $('modal-root').innerHTML = ''; });
+
+    // ================================================================
+    // INIT
+    // ================================================================
+    (async function init() {
+        await DB.open();
+        const s = await DB.get('settings');
+        if (s) state.settings = { ...state.settings, ...s };
+        if (!state.settings.focus.includes('VF')) state.settings.focus.unshift('VF');
+        state.students = (await DB.get('students')) || [];
+        state.subs = await DB.prefix('sub:');
+        state.lib = await DB.prefix('lib:');
+        state.ex = await DB.prefix('ex:');
+        renderMark();
+    })();
+    </script>
+</body>
+</html>
