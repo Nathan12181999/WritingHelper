@@ -21,6 +21,7 @@
             --danger: #ef4444;
             --focus: #7c3aed;
             --focus-bg: #f5f3ff;
+            --mark: #dc2626;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -105,16 +106,26 @@
         .script p { text-indent: 2em; margin-bottom: 4px; }
         .err { position: relative; white-space: nowrap; }
         .err .tag { position: absolute; left: 0; top: -1.35em; font-family: 'Segoe UI', sans-serif; font-size: 0.62rem; font-weight: 800; line-height: 1; white-space: nowrap; }
-        .err.focus { color: var(--focus); }
-        .err.focus .br { color: var(--focus); font-weight: 800; }
-        .err.focus .tag { color: var(--focus); }
+        .err.focus .br { color: var(--mark); font-weight: 800; }
+        .err.focus .tag { color: var(--mark); }
+        .err.focus .strike { text-decoration-color: var(--mark); }
         .err .blank { display: inline-block; min-width: 70px; border-bottom: 1px solid currentColor; }
-        .err .fix { color: #047857; font-weight: 700; }
-        .err.other { text-decoration: underline wavy #94a3b8; text-underline-offset: 4px; }
-        .err.other .tag { color: #64748b; }
+        .err .fix { color: var(--mark); font-weight: 700; }
+        .err.other { text-decoration: underline wavy #f87171; text-underline-offset: 4px; }
+        .err.other .tag { color: #b91c1c; opacity: 0.75; }
         .err.sel { background: #fef9c3; border-radius: 3px; }
         .strike { text-decoration: line-through; text-decoration-thickness: 2px; }
-        .caret { font-weight: 800; color: var(--focus); }
+        .caret { font-weight: 800; color: var(--mark); }
+        .corr-new { color: var(--mark); font-weight: 700; }
+        .corr-old { color: #94a3b8; text-decoration: line-through; font-size: 0.8em; margin-right: 3px; }
+        .folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 12px; }
+        .folder { background: var(--white); border: 1px solid var(--line); border-radius: 12px; padding: 14px; cursor: pointer; transition: 0.2s; }
+        .folder:hover { border-color: var(--gold); box-shadow: 0 4px 10px rgba(0,0,0,0.06); }
+        .folder .fa-folder { color: var(--gold); font-size: 1.6rem; margin-bottom: 6px; }
+        .folder .nm { font-weight: 800; }
+        .folder .meta { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+        .pdf-doc .script { border: none; padding: 0; }
+        .pdf-doc { position: absolute; left: -10000px; top: 0; width: 794px; padding: 48px 56px; background: #fff; color: #0f172a; }
         .viewbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
         .viewbar .chip.on { background: var(--navy); border-color: var(--navy); }
         .scan-col img { width: 100%; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; cursor: zoom-in; }
@@ -224,12 +235,15 @@
         <section id="tab-scripts" class="hidden">
             <div id="scripts-list-view">
                 <div class="card plain">
-                    <h2>Marked scripts 已批改文章</h2>
+                    <h2>Student folders 學生資料夾</h2>
+                    <p class="sub" style="margin-bottom:0;">A folder is created automatically for each new name found in the file name or on the script.</p>
                     <div class="row" style="margin-top:8px;">
                         <div><label class="f">Task</label><select id="filter-task"></select></div>
                         <div><label class="f">Class</label><select id="filter-class"></select></div>
                         <div><label class="f">Search student</label><input type="text" id="filter-name" placeholder="Name or class no."></div>
                     </div>
+                    <div class="actions" id="folder-bar"></div>
+                    <div class="folders" id="folders"></div>
                     <div class="table-wrap" style="margin-top:12px;"><table id="scripts-table"></table></div>
                 </div>
             </div>
@@ -661,20 +675,55 @@
     dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); addFilesToQueue([...e.dataTransfer.files]); });
     $('file-input').addEventListener('change', e => { addFilesToQueue([...e.target.files]); e.target.value = ''; });
 
-    function guessStudent(filename) {
-        const cls = state.settings.taskClass;
-        const pool = state.students.filter(s => !cls || s.cls === cls);
-        const base = filename.replace(/\.[^.]+$/, '').toLowerCase();
-        const byName = pool.find(s => base.includes(s.name.toLowerCase()));
-        if (byName) return byName.id;
-        const m = base.match(/(?:^|[^0-9])(\d{1,2})(?:[^0-9]|$)/);
-        if (m) { const byNo = pool.find(s => String(s.no) === String(+m[1])); if (byNo) return byNo.id; }
-        return '';
+    // --- Student folders: detect a name from the file name, e.g. "Yuen_Sze_Ting.pdf", "2A_05_Chan Tai Man.jpg" ---
+    const normName = n => String(n || '').toLowerCase().replace(/[^a-z㐀-鿿]/g, '');
+    const NOISE = /^(scan|scanned|scans|writing|draft|drafts|page|pages|p\d+|img|image|photo|copy|final|doc|document|essay|task|t\d+|composition|ricoh|\(\d+\))$/i;
+
+    function parseFilename(filename) {
+        const tokens = filename.replace(/\.[^.]+$/, '').split(/[\s_\-.,()]+/).filter(Boolean);
+        let cls = '', no = '';
+        const words = [];
+        for (const t of tokens) {
+            if (/^[1-6][A-Ea-e]$/.test(t)) cls = t.toUpperCase();
+            else if (/^\d{1,2}$/.test(t)) no = String(+t);
+            else if (/^[A-Za-z]+$/.test(t) && !NOISE.test(t)) words.push(t);
+            else if (/^[㐀-鿿]{2,4}$/.test(t)) words.push(t);
+        }
+        const name = words.length >= 1 && words.length <= 4
+            ? words.map(w => /^[A-Za-z]/.test(w) ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w).join(' ') : '';
+        return { name, cls, no };
+    }
+
+    function findStudent({ name, cls, no }) {
+        const n = normName(name);
+        if (n) {
+            const hits = state.students.filter(s => normName(s.name) === n);
+            const best = hits.find(s => !cls || s.cls === cls) || hits[0];
+            if (best) return best;
+        }
+        const c = cls || state.settings.taskClass;
+        if (!name && c && no) return state.students.find(s => s.cls === c && String(s.no) === String(no));
+        return null;
+    }
+
+    // Returns an existing student or creates a new folder for this name.
+    async function findOrCreateStudent({ name, cls, no }) {
+        const found = findStudent({ name, cls, no });
+        if (found) return found;
+        if (!normName(name)) return null;
+        const st = { id: uid(), cls: cls || state.settings.taskClass || '', no: no || '', name: name.trim() };
+        state.students.push(st);
+        await saveStudents();
+        toast(`New student folder: ${st.name}`, 3000);
+        return st;
     }
 
     async function addFilesToQueue(files) {
         for (const f of files) {
-            const item = { id: uid(), filename: f.name, pages: [], studentId: guessStudent(f.name), status: 'Reading file…', statusCls: '' };
+            const parsed = parseFilename(f.name);
+            const match = findStudent(parsed);
+            const item = { id: uid(), filename: f.name, pages: [], studentId: match?.id || '', detected: match ? null : (parsed.name ? parsed : null),
+                           status: 'Reading file…', statusCls: '' };
             state.queue.push(item); renderQueue();
             try { item.pages = await fileToPages(f); item.status = `${item.pages.length} page(s) ready`; }
             catch (e) { item.status = friendlyError(e); item.statusCls = 'err'; }
@@ -692,10 +741,11 @@
         e.target.value = ''; renderQueue();
     });
 
-    function studentOptions(selected, cls) {
+    function studentOptions(selected, cls, detected) {
         const pool = state.students.filter(s => !cls || s.cls === cls);
         const list = pool.length ? pool : state.students;
-        return `<option value="">— choose student —</option>` +
+        return (detected ? `<option value="__auto" selected>📁 New folder: ${esc(detected.name)}</option>` : '') +
+            `<option value="" ${!selected && !detected ? 'selected' : ''}>${detected ? 'Detect name from the script' : '— choose student / detect from script —'}</option>` +
             list.map(s => `<option value="${s.id}" ${s.id === selected ? 'selected' : ''}>${esc(s.cls)} ${esc(s.no)} ${esc(s.name)}</option>`).join('') +
             `<option value="__new">+ New student…</option>`;
     }
@@ -707,7 +757,7 @@
                 <div class="thumbs">${item.pages.map((p, i) => `<img class="thumb" src="${p}" data-zoom="${item.id}:${i}" alt="page ${i + 1}">`).join('') || '<div class="thumb" style="display:flex;align-items:center;justify-content:center;"><span class="spinner"></span></div>'}</div>
                 <div class="queue-meta">
                     <div style="font-size:0.8rem; color:var(--muted); margin-bottom:4px;">${esc(item.filename)}</div>
-                    <select data-act="student">${studentOptions(item.studentId, state.settings.taskClass)}</select>
+                    <select data-act="student">${studentOptions(item.studentId, state.settings.taskClass, item.detected)}</select>
                     <div class="status-line ${item.statusCls}">${esc(item.status)}</div>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:6px;">
@@ -731,6 +781,8 @@
     $('queue').addEventListener('change', async e => {
         if (e.target.dataset.act !== 'student') return;
         const item = state.queue.find(q => q.id === e.target.closest('.queue-item').dataset.id);
+        if (e.target.value === '__auto') return;
+        item.detected = null;
         if (e.target.value === '__new') {
             const s = await promptNewStudent();
             item.studentId = s ? s.id : '';
@@ -752,7 +804,6 @@
         if (!state.settings.apiKey) { toast('Add your Claude API key in Settings first.'); return switchTab('settings'); }
         const todo = state.queue.filter(i => i.pages.length && i.statusCls !== 'done');
         if (!todo.length) return toast('Upload at least one script first.');
-        if (todo.some(i => !i.studentId) && !confirm('Some scripts have no student chosen. Mark them anyway as "Unassigned"?')) return;
         const btn = $('mark-all-btn'); btn.disabled = true;
         for (const item of todo) {
             item.status = 'Marking… (reading handwriting and checking errors, about 1–2 minutes)'; item.statusCls = ''; renderQueue();
@@ -771,8 +822,11 @@
 
     const MARK_SCHEMA = {
         type: 'object', additionalProperties: false,
-        required: ['transcript', 'errors', 'strengths', 'areas_to_improve', 'growth_feedback', 'content_comment'],
+        required: ['student_name', 'student_class', 'student_number', 'transcript', 'errors', 'strengths', 'areas_to_improve', 'growth_feedback', 'content_comment'],
         properties: {
+            student_name: { type: 'string', description: "Student's real name if written on the page, else empty." },
+            student_class: { type: 'string' },
+            student_number: { type: 'string' },
             transcript: { type: 'string', description: 'Exact transcription of the handwriting, errors kept. Paragraphs separated by a blank line.' },
             errors: {
                 type: 'array', items: {
@@ -811,7 +865,8 @@ Article errors: wrong article → WW; missing article → MISS; redundant articl
 When one verb shows both a form error and a tense error (e.g. "He were doing homework now": were/was = VF, was/is = VT), use code VF and also_code VT.
 
 How to work:
-1. Transcribe the handwriting EXACTLY as written, keeping every mistake, the student's spelling and paragraphing. Do not fix anything in the transcript. Write [?] for a word you truly cannot read. Ignore crossed-out words.
+0. student_name / student_class / student_number: copy them only if the student wrote their real name, class or class number on the page (e.g. a Name / Class / No. line). Pen names and signatures inside the writing (e.g. "Written by Ruby") are part of the task, not the student's name. Use empty strings when absent.
+1. Transcribe ONLY the student's own handwriting. Skip printed text on the worksheet (titles, questions, self-checklists, tick boxes, page numbers). Transcribe the handwriting EXACTLY as written, keeping every mistake, the student's spelling and paragraphing. Do not fix anything in the transcript. Write [?] for a word you truly cannot read. Ignore crossed-out words.
 2. List every language error you find in the order it appears, not only the focus areas — the teacher decides what to show. Each error needs:
    - original: the shortest exact substring of your transcript that contains the error (copy it character-for-character so it can be found). For MISS, give the word right after the gap (or right before it at the end of a sentence). For ST / IU, give the whole problem phrase or clause.
    - correction: what that same substring should become (for RED, the substring with the extra words removed, or empty).
@@ -842,6 +897,12 @@ The student's handwritten draft (${item.pages.length} page(s)) follows.` },
             { type: 'text', text: 'Transcribe and mark this draft following your instructions.' }
         ];
         const r = await callClaude({ system: MARK_SYSTEM, content, schema: MARK_SCHEMA });
+        if (!item.studentId) {
+            // No student chosen: use the name from the file name, else the name written on the script.
+            const guess = item.detected || { name: r.student_name, cls: r.student_class.toUpperCase().replace(/\s/g, ''), no: r.student_number.replace(/\D/g, '') };
+            const st = await findOrCreateStudent(guess);
+            if (st) item.studentId = st.id;
+        }
         const sub = {
             id: uid(), studentId: item.studentId || '', created: new Date().toISOString(),
             task: s.taskTitle || 'Untitled task', level: s.taskLevel,
@@ -908,6 +969,7 @@ The student's handwritten draft (${item.pages.length} page(s)) follows.` },
         const showOther = view === 'teacher' || (view === 'student' && state.settings.showOther);
         const marks = placed.filter(p => p.start >= 0 && (isFocus(p.e, sub) || showOther)).sort((a, b) => a.start - b.start);
         if (view === 'clean') return paragraphs(esc(t));
+        if (view === 'corrected') return renderCorrectedHtml(sub, placed, true);
         let html = '', pos = 0;
         for (const p of marks) {
             html += esc(t.slice(pos, p.start));
@@ -927,6 +989,21 @@ The student's handwritten draft (${item.pages.length} page(s)) follows.` },
         html += esc(t.slice(pos));
         return paragraphs(html);
     }
+    // Corrected version: every ticked error replaced by its correction, changes in red
+    function renderCorrectedHtml(sub, placed, showOld) {
+        const t = sub.transcript || '';
+        const marks = placed.filter(p => p.start >= 0).sort((a, b) => a.start - b.start);
+        let html = '', pos = 0;
+        for (const p of marks) {
+            html += esc(t.slice(pos, p.start));
+            const old = t.slice(p.start, p.end), fix = p.e.correction || '';
+            if (showOld && old !== fix) html += `<span class="corr-old">${esc(old)}</span>`;
+            html += fix ? `<span class="corr-new">${esc(fix)}</span>` : '';
+            pos = p.end;
+        }
+        html += esc(t.slice(pos));
+        return paragraphs(html);
+    }
     const paragraphs = html => html.split(/\n\s*\n/).map(p => `<p>${p.replace(/\n/g, ' ')}</p>`).join('');
 
     // ================================================================
@@ -938,25 +1015,80 @@ The student's handwritten draft (${item.pages.length} page(s)) follows.` },
     }
     const uniq = a => [...new Set(a.filter(Boolean))].sort();
 
+    function filteredSubs() {
+        const ft = $('filter-task').value, fc = $('filter-class').value, fn = $('filter-name').value.trim().toLowerCase();
+        return state.subs.filter(s => (!ft || s.task === ft) && (!fc || s.cls === fc) && (!fn || studentName(s.studentId).toLowerCase().includes(fn)));
+    }
+
     function renderScriptsList() {
         $('script-detail').classList.add('hidden'); $('scripts-list-view').classList.remove('hidden');
         fillSelect($('filter-task'), uniq(state.subs.map(s => s.task)));
-        fillSelect($('filter-class'), uniq(state.subs.map(s => s.cls)));
-        const ft = $('filter-task').value, fc = $('filter-class').value, fn = $('filter-name').value.trim().toLowerCase();
-        const rows = state.subs.filter(s => (!ft || s.task === ft) && (!fc || s.cls === fc) && (!fn || studentName(s.studentId).toLowerCase().includes(fn)))
-            .sort((a, b) => b.created.localeCompare(a.created));
+        fillSelect($('filter-class'), uniq([...state.subs.map(s => s.cls), ...state.students.map(s => s.cls)]));
+        const subs = filteredSubs();
+        const fc = $('filter-class').value, fn = $('filter-name').value.trim().toLowerCase();
+
+        if (state.openFolder === undefined) {
+            // Folder grid: every student (with or without scripts) plus "Unassigned"
+            const ids = new Set(subs.map(s => s.studentId));
+            state.students.filter(st => (!fc || st.cls === fc) && (!fn || studentName(st.id).toLowerCase().includes(fn))).forEach(st => ids.add(st.id));
+            const list = [...ids].sort((a, b) => (a ? 0 : 1) - (b ? 0 : 1) || studentName(a).localeCompare(studentName(b), undefined, { numeric: true }));
+            $('folder-bar').innerHTML = subs.length ? `<button class="btn btn-light btn-sm" id="zip-all"><i class="fas fa-file-zipper"></i> Download all folders (ZIP)</button>` : '';
+            $('folders').innerHTML = list.length ? list.map(id => {
+                const own = subs.filter(s => s.studentId === id);
+                const last = own.map(s => s.created).sort().pop();
+                const focus = own.reduce((n, s) => n + s.errors.filter(e => e.on && isFocus(e, s)).length, 0);
+                return `<div class="folder" data-folder="${id}">
+                    <i class="fas fa-folder"></i>
+                    <div class="nm">${esc(id ? studentOf({ studentId: id })?.name || 'Unknown' : 'Unassigned')}</div>
+                    <div class="meta">${id ? esc([studentOf({ studentId: id })?.cls, studentOf({ studentId: id })?.no].filter(Boolean).join(' · ')) : ''}</div>
+                    <div class="meta">${own.length} script(s)${own.length ? ` · ${focus} focus error(s)` : ''}${last ? ' · ' + new Date(last).toLocaleDateString() : ''}</div>
+                </div>`;
+            }).join('') : '<p class="empty">No students or marked scripts yet. Upload scans in the Mark tab.</p>';
+            $('scripts-table').innerHTML = '';
+            return;
+        }
+
+        // Inside one folder
+        const id = state.openFolder;
+        const rows = subs.filter(s => s.studentId === id).sort((a, b) => b.created.localeCompare(a.created));
+        $('folders').innerHTML = '';
+        $('folder-bar').innerHTML = `
+            <button class="btn btn-light btn-sm" id="folder-up"><i class="fas fa-arrow-left"></i> All folders</button>
+            <b style="font-size:1.05rem;"><i class="fas fa-folder-open" style="color:var(--gold)"></i> ${esc(id ? studentName(id) : 'Unassigned')}</b>
+            ${rows.length ? `<button class="btn btn-primary btn-sm" id="zip-folder"><i class="fas fa-file-zipper"></i> Download folder (ZIP)</button>` : ''}
+            ${id ? `<button class="btn btn-light btn-sm" id="folder-profile"><i class="fas fa-user-graduate"></i> Individual profile</button>
+                    <button class="btn btn-light btn-sm" id="folder-rename"><i class="fas fa-pen"></i> Rename</button>` : ''}`;
         $('scripts-table').innerHTML = rows.length ? `
-            <tr><th>Student</th><th>Task</th><th>Words</th><th>Focus errors</th><th>All errors</th><th>Status</th><th>Date</th></tr>
+            <tr><th>Task</th><th>Words</th><th>Focus errors</th><th>All errors</th><th>Status</th><th>Date</th></tr>
             ${rows.map(s => {
                 const on = s.errors.filter(e => e.on);
                 return `<tr class="clickable" data-sid="${s.id}">
-                    <td><b>${esc(studentName(s.studentId))}</b></td><td>${esc(s.task)}</td><td class="num">${s.wordCount}</td>
+                    <td><b>${esc(s.task)}</b></td><td class="num">${s.wordCount}</td>
                     <td class="num"><span class="pill focus">${on.filter(e => isFocus(e, s)).length}</span></td>
                     <td class="num">${on.length}</td>
                     <td>${s.reviewed ? '<span class="pill ok">Checked</span>' : '<span class="pill warn">AI draft</span>'}</td>
                     <td>${new Date(s.created).toLocaleDateString()}</td></tr>`;
-            }).join('')}` : `<tr><td class="empty">No marked scripts yet. Upload scans in the Mark tab.</td></tr>`;
+            }).join('')}` : `<tr><td class="empty">No scripts in this folder yet.</td></tr>`;
     }
+
+    $('folders').addEventListener('click', e => {
+        const f = e.target.closest('[data-folder]'); if (!f) return;
+        state.openFolder = f.dataset.folder; renderScriptsList();
+    });
+    $('folder-bar').addEventListener('click', async e => {
+        const id = e.target.closest('button')?.id;
+        if (id === 'folder-up') { state.openFolder = undefined; renderScriptsList(); }
+        if (id === 'zip-folder') downloadZip(filteredSubs().filter(s => s.studentId === state.openFolder), e.target.closest('button'));
+        if (id === 'zip-all') downloadZip(filteredSubs(), e.target.closest('button'));
+        if (id === 'folder-profile') { state.profileStudent = state.openFolder; switchTab('students'); }
+        if (id === 'folder-rename') {
+            const st = studentOf({ studentId: state.openFolder });
+            const raw = prompt('Class, class no., name', `${st.cls}, ${st.no}, ${st.name}`);
+            if (!raw) return;
+            const [cls, no, ...rest] = raw.split(',').map(x => x.trim());
+            if (rest.join(' ')) { st.cls = cls; st.no = no; st.name = rest.join(' '); await saveStudents(); renderScriptsList(); }
+        }
+    });
     ['filter-task', 'filter-class'].forEach(id => $(id).addEventListener('change', renderScriptsList));
     $('filter-name').addEventListener('input', renderScriptsList);
     $('scripts-table').addEventListener('click', e => { const r = e.target.closest('tr[data-sid]'); if (r) openScript(r.dataset.sid); });
@@ -979,9 +1111,9 @@ The student's handwritten draft (${item.pages.length} page(s)) follows.` },
 
         $('script-detail').innerHTML = `
             <div class="actions" style="margin:0 0 12px;">
-                <button class="btn btn-light" id="sd-back"><i class="fas fa-arrow-left"></i> All scripts</button>
-                <button class="btn btn-primary" id="sd-print"><i class="fas fa-print"></i> Print student copy</button>
-                <button class="btn btn-light" id="sd-print-key"><i class="fas fa-print"></i> Print teacher key</button>
+                <button class="btn btn-light" id="sd-back"><i class="fas fa-arrow-left"></i> Folder</button>
+                <button class="btn btn-primary" id="sd-pdf"><i class="fas fa-file-pdf"></i> Download PDF (this view)</button>
+                <button class="btn btn-light" id="sd-print"><i class="fas fa-print"></i> Print (this view)</button>
                 <button class="btn btn-light" id="sd-copy"><i class="fas fa-copy"></i> Copy e-draft (OCR text)</button>
                 <button class="btn ${sub.reviewed ? 'btn-light' : 'btn-gold'}" id="sd-review"><i class="fas fa-check"></i> ${sub.reviewed ? 'Checked ✓' : 'Mark as checked'}</button>
                 <button class="btn btn-danger" id="sd-delete"><i class="fas fa-trash"></i></button>
@@ -1003,6 +1135,7 @@ The student's handwritten draft (${item.pages.length} page(s)) follows.` },
                     <div class="viewbar">
                         <button class="chip ${state.view === 'student' ? 'on' : ''}" data-view="student">Student copy (blank brackets)</button>
                         <button class="chip ${state.view === 'teacher' ? 'on' : ''}" data-view="teacher">Teacher key (all errors)</button>
+                        <button class="chip ${state.view === 'corrected' ? 'on' : ''}" data-view="corrected">Corrected version 改正版</button>
                         <button class="chip ${state.view === 'clean' ? 'on' : ''}" data-view="clean">Edit OCR text</button>
                     </div>
                     ${state.view === 'clean'
@@ -1063,9 +1196,15 @@ The student's handwritten draft (${item.pages.length} page(s)) follows.` },
             if (row) { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.style.background = '#fef9c3'; setTimeout(() => row.style.background = '', 1500); }
             return;
         }
-        if (id === 'sd-back') return renderScriptsList();
-        if (id === 'sd-print') return printScript(sub, 'student');
-        if (id === 'sd-print-key') return printScript(sub, 'teacher');
+        if (id === 'sd-back') { state.openFolder = sub.studentId; return renderScriptsList(); }
+        if (id === 'sd-print') return printScript(sub, state.view === 'clean' ? 'teacher' : state.view);
+        if (id === 'sd-pdf') {
+            const view = state.view === 'clean' ? 'teacher' : state.view;
+            const btn = e.target.closest('button'); btn.disabled = true;
+            try { downloadBlob(await htmlToPdf(docHtml(sub, view)), `${fileSafe(studentName(sub.studentId))} - ${fileSafe(sub.task)} - ${VIEW_NAMES[view]}.pdf`); }
+            catch (err) { toast(friendlyError(err), 4000); }
+            btn.disabled = false; return;
+        }
         if (id === 'sd-copy') { await navigator.clipboard.writeText(sub.transcript); return toast('E-draft text copied — students can paste it into Penso / StarLab.'); }
         if (id === 'sd-review') { sub.reviewed = !sub.reviewed; await saveSub(sub); return renderScriptDetail(); }
         if (id === 'sd-delete') {
@@ -1108,18 +1247,127 @@ The student's handwritten draft (${item.pages.length} page(s)) follows.` },
         await saveSub(sub); renderScriptDetail();
     });
 
-    function printScript(sub, view) {
+    const VIEW_NAMES = { student: 'student copy', teacher: 'teacher key', corrected: 'corrected version' };
+
+    // One printable document for a script: student copy, teacher key or corrected version
+    function docHtml(sub, view) {
         const st = studentOf(sub);
         const focusLegend = sub.focus.map(k => `<b>${esc(CODES[k].label)}</b> ${esc(CODES[k].name)}`).join('; ');
-        $('print-area').innerHTML = `
-            <h2 style="margin-bottom:4px;">${esc(sub.task)} ${view === 'teacher' ? '— Teacher key' : ''}</h2>
+        const title = { student: '', teacher: ' — Teacher key', corrected: ' — Corrected version 改正版' }[view];
+        const note = {
+            student: `Focus: ${focusLegend}. Write your correction inside each bracket.`,
+            teacher: `Focus: ${focusLegend}. Red = errors and corrections; wavy underline = other errors spotted by AI.`,
+            corrected: 'Words in <b style="color:#dc2626">red</b> have been corrected; your original words are shown in grey with a line through them.'
+        }[view];
+        return `
+            <h2 style="margin-bottom:4px;">${esc(sub.task)}${title}</h2>
             <p style="margin-bottom:10px;">Name: <b>${esc(st?.name || '______________')}</b> &nbsp; Class: <b>${esc(st?.cls || sub.cls || '____')}</b> &nbsp; No.: <b>${esc(st?.no || '___')}</b></p>
-            <p style="font-size:0.85rem; margin-bottom:10px;">Focus: ${focusLegend}. ${view === 'student' ? 'Write your correction inside each bracket.' : ''}</p>
+            <p style="font-size:0.85rem; margin-bottom:10px;">${note}</p>
             <div class="script">${renderScriptHtml(sub, view)}</div>
-            ${view === 'student' ? `<h3 style="margin-top:16px;">Teacher's feedback</h3><p style="line-height:1.6;">${esc(sub.growth)}</p>
+            ${view !== 'teacher' ? `<h3 style="margin-top:16px;">Teacher's feedback</h3><p style="line-height:1.6;">${esc(sub.growth)}</p>
                 ${(sub.strengths || []).length ? `<p style="margin-top:8px;"><b>What you did well:</b></p><ul style="padding-left:20px;">${sub.strengths.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
                 ${(sub.improve || []).length ? `<p style="margin-top:8px;"><b>Next steps:</b></p><ul style="padding-left:20px;">${sub.improve.map(a => `<li><b>${esc(a.area)}</b> — ${esc(a.how)}</li>`).join('')}</ul>` : ''}` : ''}`;
+    }
+
+    function printScript(sub, view) {
+        $('print-area').innerHTML = docHtml(sub, view);
         window.print();
+    }
+
+    // ================================================================
+    // PDF + ZIP EXPORT
+    // ================================================================
+    const JSPDF_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    const H2C_URL = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    const JSZIP_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    const fileSafe = s => String(s || 'Untitled').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+
+    function downloadBlob(blob, name) {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = name; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    }
+
+    // Render HTML to an A4 PDF, breaking pages between lines of text rather than through them.
+    async function htmlToPdf(html) {
+        await Promise.all([loadScript(JSPDF_URL), loadScript(H2C_URL)]);
+        const box = document.createElement('div');
+        box.className = 'pdf-doc'; box.innerHTML = html;
+        document.body.appendChild(box);
+        try {
+            await document.fonts.ready;
+            const top = box.getBoundingClientRect().top;
+            const breaks = new Set([0]);
+            const range = document.createRange();
+            box.querySelectorAll('p, li, h2, h3').forEach(el => {
+                range.selectNodeContents(el);
+                for (const r of range.getClientRects()) breaks.add(Math.ceil(r.bottom - top + 6));
+            });
+            const canvas = await html2canvas(box, { scale: 2, backgroundColor: '#ffffff' });
+            const scale = canvas.width / box.offsetWidth;
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+            const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+            const pagePx = box.offsetWidth * ph / pw;
+            const cuts = [...breaks].sort((a, b) => a - b);
+            let y = 0, first = true;
+            while (y < box.offsetHeight - 1) {
+                let end = Math.min(y + pagePx, box.offsetHeight);
+                if (end < box.offsetHeight) {
+                    const good = cuts.filter(c => c > y + pagePx * 0.5 && c <= y + pagePx).pop();
+                    if (good) end = good;
+                }
+                const slice = document.createElement('canvas');
+                slice.width = canvas.width; slice.height = Math.round((end - y) * scale);
+                const ctx = slice.getContext('2d');
+                ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, slice.width, slice.height);
+                ctx.drawImage(canvas, 0, Math.round(y * scale), canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+                if (!first) pdf.addPage();
+                pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pw, (end - y) * pw / box.offsetWidth);
+                first = false; y = end;
+            }
+            return pdf.output('blob');
+        } finally { box.remove(); }
+    }
+
+    async function scansToPdf(pages) {
+        await loadScript(JSPDF_URL);
+        const { jsPDF } = window.jspdf;
+        let pdf = null;
+        for (const src of pages) {
+            const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+            const orient = img.width > img.height ? 'landscape' : 'portrait';
+            if (!pdf) pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: orient }); else pdf.addPage('a4', orient);
+            const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+            const k = Math.min(pw / img.width, ph / img.height);
+            pdf.addImage(src, 'JPEG', (pw - img.width * k) / 2, (ph - img.height * k) / 2, img.width * k, img.height * k);
+        }
+        return pdf.output('blob');
+    }
+
+    // ZIP with one folder per student: original scan + student copy + teacher key + corrected version
+    async function downloadZip(subs, btn) {
+        if (!subs.length) return toast('No scripts to download.');
+        const old = btn?.innerHTML; if (btn) btn.disabled = true;
+        try {
+            await loadScript(JSZIP_URL);
+            const zip = new JSZip();
+            let n = 0;
+            for (const sub of subs) {
+                if (btn) btn.innerHTML = `<span class="spinner"></span> ${++n}/${subs.length}`;
+                const st = studentOf(sub);
+                const folder = zip.folder(fileSafe(st ? `${st.cls ? st.cls + ' ' : ''}${st.no ? st.no + ' ' : ''}${st.name}` : 'Unassigned'));
+                const base = fileSafe(sub.task) + (subs.filter(x => x.studentId === sub.studentId && x.task === sub.task).length > 1 ? ' ' + sub.created.slice(0, 10) + ' ' + sub.id.slice(-4) : '');
+                folder.file(`${base} - 0 original scan.pdf`, await scansToPdf(sub.pages));
+                folder.file(`${base} - 1 student copy.pdf`, await htmlToPdf(docHtml(sub, 'student')));
+                folder.file(`${base} - 2 teacher key.pdf`, await htmlToPdf(docHtml(sub, 'teacher')));
+                folder.file(`${base} - 3 corrected version.pdf`, await htmlToPdf(docHtml(sub, 'corrected')));
+            }
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const ids = new Set(subs.map(s => s.studentId));
+            downloadBlob(blob, ids.size === 1 ? `${fileSafe(studentName([...ids][0]))}.zip` : `Writing scripts ${new Date().toISOString().slice(0, 10)}.zip`);
+        } catch (e) { console.error(e); toast(friendlyError(e), 5000); }
+        if (btn) { btn.disabled = false; btn.innerHTML = old; }
     }
 
     // ================================================================
